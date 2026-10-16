@@ -34,6 +34,36 @@ fn oauth_listen(app: AppHandle) -> Result<u16, String> {
     Ok(port)
 }
 
+/// Envoi d'un gros fichier (son original) vers Google Drive : le corps arrive tel quel depuis la page (sans conversion), l'app fait la requête.
+/// En-têtes : x-url (adresse d'envoi donnée par Drive), x-type (type du fichier). Réponse : { status, body }.
+#[tauri::command]
+async fn drive_put(request: tauri::ipc::Request<'_>) -> Result<serde_json::Value, String> {
+    let h = request.headers();
+    let url = h.get("x-url").and_then(|v| v.to_str().ok()).ok_or("adresse manquante")?.to_string();
+    if !url.starts_with("https://www.googleapis.com/upload/") && !url.starts_with("http://127.0.0.1:") { return Err("adresse refusée".into()); }
+    let ctype = h.get("x-type").and_then(|v| v.to_str().ok()).unwrap_or("application/octet-stream").to_string();
+    let body = match request.body() { tauri::ipc::InvokeBody::Raw(b) => b.clone(), _ => return Err("fichier manquant".into()) };
+    let r = reqwest::Client::new().put(&url).header("Content-Type", ctype).body(body).send().await.map_err(|e| e.to_string())?;
+    let status = r.status().as_u16();
+    let text = r.text().await.unwrap_or_default();
+    Ok(serde_json::json!({ "status": status, "body": text }))
+}
+
+/// Écran allumé pendant une session (Mac : « caffeinate », tant que l'app tourne) ; ailleurs : rien.
+static AWAKE: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mutex::new(None);
+#[tauri::command]
+fn keep_awake(on: bool) {
+    let mut g = AWAKE.lock().unwrap();
+    if let Some(mut c) = g.take() { let _ = c.kill(); let _ = c.wait(); }
+    #[cfg(target_os = "macos")]
+    if on {
+        let pid = std::process::id().to_string();
+        *g = std::process::Command::new("/usr/bin/caffeinate").args(["-di", "-w", &pid]).spawn().ok();
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = on;
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -41,7 +71,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
-        .invoke_handler(tauri::generate_handler![oauth_listen])
+        .invoke_handler(tauri::generate_handler![oauth_listen, drive_put, keep_awake])
         .run(tauri::generate_context!())
         .expect("Planning prod n'a pas pu démarrer");
 }

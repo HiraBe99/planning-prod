@@ -2629,7 +2629,10 @@ const gdAssets = {
   upload: async (blob, o) => { const type = (o && o.type) || blob.type || 'application/octet-stream', sid = await gdSons();
     const r = await gdF(GUP + '?uploadType=resumable&fields=id', { method:'POST', headers:{ 'Content-Type':'application/json; charset=UTF-8', 'X-Upload-Content-Type':type }, body: JSON.stringify({ name: blob.name || 'fichier', parents:[sid] }) });
     const loc = r.headers.get('Location'); if (!loc) throw { code:'upload' };
-    let r2; try{ r2 = await gfetch(loc, { method:'PUT', headers:{ 'Content-Type':type }, body: DESK ? new Uint8Array(await blob.arrayBuffer()) : blob }); }catch(e){ throw { code:'offline' }; }
+    if (DESK){ /* étape 149 : app de bureau : le fichier part tel quel par l'app (le module http de l'app le convertissait en texte : trop lourd pour un son) */
+      let x; try{ x = await window.__TAURI__.core.invoke('drive_put', new Uint8Array(await blob.arrayBuffer()), { headers:{ 'x-url':loc, 'x-type':type } }); }catch(e){ throw { code:'offline' }; }
+      if (!x || x.status < 200 || x.status >= 300) throw { code: x && x.status === 401 ? 'auth' : 'http_' + (x && x.status) }; const j = JSON.parse(x.body || '{}'); return { id:'gd:' + j.id, sizeBytes:blob.size, contentType:type }; }
+    let r2; try{ r2 = await fetch(loc, { method:'PUT', headers:{ 'Content-Type':type }, body:blob }); }catch(e){ throw { code:'offline' }; }
     if (!r2.ok) throw { code:'http_' + r2.status }; const j = await r2.json(); return { id:'gd:' + j.id, sizeBytes:blob.size, contentType:type }; },
   delete: async ref => { ref = String(ref || ''); if (ref.indexOf('gd:') !== 0) return { deleted:false }; try{ await gdF(GAPI + '/' + ref.slice(3), { method:'DELETE' }); return { deleted:true }; }catch(e){ if (e.code === 'not_found') return { deleted:false }; throw e; } }
 };
@@ -2706,7 +2709,7 @@ if (DESK) setInterval(() => { try{ if (GD.st.on && GD.st.rt && !GD.wait && (+GD.
 /* app de bureau : enregistrer un fichier (sauvegardes) avec la fenêtre « Enregistrer sous » du système */
 async function deskSave(name, data){ const T = window.__TAURI__; try{ const p = await T.core.invoke('plugin:dialog|save', { options:{ defaultPath:name } }); if (!p) return false;
   const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data instanceof Blob ? await data.arrayBuffer() : data);
-  await T.core.invoke('plugin:fs|write_file', bytes, { headers:{ path:encodeURIComponent(p), options:JSON.stringify({}) } }); toast('Enregistré ✓'); return true; }catch(e){ console.error('enregistrement', e); toast('Enregistrement impossible'); return false; } }
+  await T.core.invoke('plugin:fs|write_file', bytes, { headers:{ path:encodeURIComponent(p), options:JSON.stringify({}) } }); return true; }catch(e){ console.error('enregistrement', e); toast('Enregistrement impossible'); return false; } }
 async function gdMenuClick(){
   if (!GD.st.on){ gdConnect(); return; }
   if (gdNeed()){ gdConnect(); return; }
@@ -3024,7 +3027,7 @@ async function forceThisDevice(rt){ if (!db) return; takeSnapshot('Avant : cet a
   restoreBundle(stateBundle('Cet appareil remplace la synchronisation'), true);
   rp.forEach(p => { if (!ici.has(p) && !MAPS.includes(p) && !ARR_IDS.includes(p)) poser(meta, p, undefined); }); /* ce qui n'existe qu'ailleurs : effacé */
   const n = Date.now(), c = cheminsMeta(meta), t = meta.__t = isObj(meta.__t) ? meta.__t : {}; Object.keys(c).concat(rp).forEach(p => { if (!MAPS.includes(p) && !ARR_IDS.includes(p)) t[p] = n; }); vuMeta(); saveLocal(); loadProject(); afterProjectChange();
-  dbSave('meta/suivi', () => meta, true); flushSaves(); toast('Cet appareil a remplacé la synchronisation'); }
+  dbSave('meta/suivi', () => meta, true); flushSaves(); toast('Cet appareil a remplacé la synchronisation'); try{ gdQueueSons(); }catch(e){} }
 /* étape 148 : cet appareil reprend tout de la synchronisation (ce qui est ici est mis de côté dans une copie de secours) */
 async function takeRemote(){ if (!db) return false; let ok = false; try{ ok = (await db.doc(dp('meta/suivi')).get()).exists; }catch(e){} if (!ok){ toast('Rien à récupérer : la synchronisation est vide'); return false; }
   takeSnapshot('Avant : récupérer la synchronisation'); flushSaves();
@@ -4546,6 +4549,7 @@ function play(kind){
 /* ----- wake lock ----- */
 let wake = null;
 async function keepAwake(on){
+  if (typeof DESK !== 'undefined' && DESK){ try{ await window.__TAURI__.core.invoke('keep_awake', { on:!!on }); }catch(e){} } /* étape 149 : app Mac : écran allumé pendant la session */
   try{
     if (on && 'wakeLock' in navigator && !wake){ wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); }
     if (!on && wake){ await wake.release(); wake = null; }
@@ -5366,7 +5370,7 @@ function textDialog(title, help, value, readonly){
   });
 }
 /* étape 124 : enregistrer un fichier hors de Claude (téléchargement du navigateur) */
-function fileSave(name, txt, type){ if (typeof DESK !== 'undefined' && DESK){ deskSave(name, txt); return true; } try{ const u = URL.createObjectURL(new Blob([txt], { type: type || 'application/json' })), a = document.createElement('a'); a.href = u; a.download = name; a.style.display = 'none'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); return true; }catch(e){ return false; } }
+function fileSave(name, txt, type){ if (typeof DESK !== 'undefined' && DESK){ deskSave(name, txt).then(ok => { if (ok) toast('Enregistré ✓'); }); return true; } try{ const u = URL.createObjectURL(new Blob([txt], { type: type || 'application/json' })), a = document.createElement('a'); a.href = u; a.download = name; a.style.display = 'none'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); return true; }catch(e){ return false; } }
 /* étape 125 : historique du planning : ce qui a changé (dates, sessions ajoutées, recalages, noms, sessions faites), daté, gardé et synchronisé ; 400 lignes au plus */
 function planLog(t){ try{ const m = meta.planLog = isObj(meta.planLog) ? meta.planLog : {}, k = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   m[k] = { at:new Date().toISOString(), t:String(t).slice(0, 240) }; const ks = Object.keys(m); if (ks.length > 400) ks.sort((a, b) => String((m[a] || {}).at) < String((m[b] || {}).at) ? -1 : 1).slice(0, ks.length - 400).forEach(x => { delete m[x]; }); }catch(e){} }
@@ -5382,6 +5386,7 @@ async function exportBackup(){
   const txt = JSON.stringify(stateBundle('Sauvegarde manuelle'), null, 1), name = base + '-SAUVEGARDE-' + todayISO() + '.json';
   const fallback = () => textDialog('Sauvegarde complète', 'Copie ce texte et enregistre-le dans un fichier .json. Pour restaurer : menu ⋯ puis « Restaurer ».', txt, true);
   try{ const dl = window.claude?.use ? await window.claude.use('downloads') : null;
+    if (DESK){ if (await deskSave(name, txt)){ saveNote('Sauvegarde exportée · à l\'instant'); toast('Sauvegarde enregistrée ✓'); } return; } /* étape 149 : app de bureau : message seulement une fois le fichier vraiment enregistré */
     if (!dl){ if (fileSave(name, txt)){ saveNote('Sauvegarde exportée · à l\'instant'); toast('Sauvegarde enregistrée ✓'); } else await fallback(); return; } /* étape 124 : hors de Claude, téléchargement normal */
     await dl.save({ filename:name, data:txt }); saveNote('Sauvegarde exportée · à l\'instant');
     toast('Sauvegarde enregistrée ✓');
@@ -5448,6 +5453,7 @@ async function exportWithSounds(){
     const na = man.files.filter(x => x.k === 'a').length, nc = man.files.filter(x => x.src === 'copie').length, nm = man.manque.length;
     const msg = 'Sauvegarde enregistrée ✓ · ' + na + ' son' + (na > 1 ? 's' : '') + (nc ? ' (dont ' + nc + ' en copie compressée)' : '') + (nm ? ' · ' + nm + ' introuvable' + (nm > 1 ? 's' : '') + ' ici' : '');
     say(null); const dl = window.claude?.use ? await window.claude.use('downloads') : null;
+    if (DESK){ if (await deskSave(name, zip)){ saveNote('Sauvegarde exportée · à l\'instant'); toast(msg); } return; }
     if (!dl){ if (fileSave(name, zip, 'application/zip')){ saveNote('Sauvegarde exportée · à l\'instant'); toast(msg); } else toast('Enregistrement impossible dans ce navigateur'); return; }
     await dl.save({ filename:name, data:zip }); saveNote('Sauvegarde exportée · à l\'instant'); toast(msg);
   }catch(e){ say(null); if (e && e.code === 'declined') return; console.error('sauvegarde avec les sons', e); toast(e && (e.code === 'rejected_extension' || e.code === 'extension_not_enabled') ? 'Le .zip n\'est pas permis ici : essaie depuis un autre appareil' : e && e.message === 'trop gros' ? 'Trop gros pour un seul fichier (4 Go)' : 'La sauvegarde avec les sons n\'a pas pu être faite'); }
@@ -5464,6 +5470,7 @@ async function importWithSounds(f){ const say = busyDialog('Restauration');
       await auPut(x.id, { blob:new Blob([bl], ty ? { type:ty } : {}), peaks:null, copy:x.src === 'copie' }); AU.has[x.id] = true; AU.bufs.delete(x.id); if (x.k === 'a') na++; else ni++; }
     say(null); try{ Object.keys(AU.st).forEach(auRenderAll); if (document.getElementById('libovl')) libRender(); }catch(e){}
     restoredToast('Sauvegarde restaurée · ' + na + ' son' + (na > 1 ? 's' : '') + (ni ? ', ' + ni + ' image' + (ni > 1 ? 's' : '') : ''), r);
+    setTimeout(() => { try{ gdQueueSons(); }catch(e){} }, 1500); /* étape 149 : Drive relié : les sons restaurés y partent tout de suite */
   }catch(e){ say(null); console.error('restauration avec les sons', e); toast('La restauration des sons n\'a pas pu se faire'); } }
 /* versions automatiques dans le temps : un instantané toutes les 5 min quand quelque chose a changé */
 function autoList(){ return VERS.a; }
@@ -5878,6 +5885,7 @@ function init(){
   tPop.addEventListener('click', ev => { ev.stopPropagation(); const tb = ev.target.closest('[data-tex-pick]'); if (tb){ texSet(+tb.dataset.texPick); renderThemePop(); return; } const b = ev.target.closest('[data-theme-pick]'); if (!b) return; const k = b.dataset.themePick, was = themePref();
     if (was === 'random' && THEMES.some(x => x.id === k)){ writeLS(RND_PICK, { p:periodIndex(), t:k }); applyTheme(); renderThemePop(); return; } /* étape 146 : Aléatoire reste actif */
     if (k === 'random' && was === 'random'){ const c = appliedTheme(); try{ localStorage.removeItem(RND_PICK); }catch(e){} writeLS(THEME_KEY, c); setPref('theme', c); applyTheme(); renderThemePop(); return; } /* recliquer : Aléatoire s'arrête sur le thème affiché */
+    if (k === 'random'){ writeLS(RND_PICK, { p:periodIndex(), t:appliedTheme() }); writeLS(THEME_KEY, k); setPref('theme', k); applyTheme(); renderThemePop(); return; } /* étape 149 : activer Aléatoire garde le thème affiché jusqu'au prochain changement */
     try{ localStorage.removeItem(RND_PICK); }catch(e){} writeLS(THEME_KEY, k); setPref('theme', k); applyTheme(); renderThemePop(); });
   document.addEventListener('click', ev => { if (!tPop.hidden && !ev.target.closest('#theme-pop')) closePop(); });
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !tPop.hidden) closePop(); });
@@ -7004,11 +7012,14 @@ function bindSearch(){
 /* ----- plein écran ----- */
 const FS_ON = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5v-4h4M12.5 3.5h4v4M16.5 12.5v4h-4M7.5 16.5h-4v-4"/></svg>';
 const FS_OFF = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 3.5v4h-4M16.5 7.5h-4v-4M12.5 16.5v-4h4M3.5 12.5h4v4"/></svg>';
-function fsActive(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+/* étape 149 : app de bureau : vrai plein écran de la fenêtre (celui de la page n'existe pas toujours dans l'app) */
+let DESK_FS = false; const deskWin = () => window.__TAURI__ && window.__TAURI__.window && window.__TAURI__.window.getCurrentWindow();
+function fsActive(){ if (typeof DESK !== 'undefined' && DESK && deskWin()) return DESK_FS; return !!(document.fullscreenElement || document.webkitFullscreenElement); }
 function fsIcon(){ return fsActive() ? FS_OFF : FS_ON; }
-function fsSupported(){ const d = document.documentElement; return !!(d.requestFullscreen || d.webkitRequestFullscreen) && (document.fullscreenEnabled !== false || document.webkitFullscreenEnabled); }
+function fsSupported(){ if (typeof DESK !== 'undefined' && DESK && deskWin()) return true; const d = document.documentElement; return !!(d.requestFullscreen || d.webkitRequestFullscreen) && (document.fullscreenEnabled !== false || document.webkitFullscreenEnabled); }
 function fsSync(){ document.querySelectorAll('.fs-btn').forEach(b => { b.innerHTML = fsIcon(); const l = fsActive() ? 'Quitter le plein écran' : 'Plein écran'; b.setAttribute('aria-label', l); b.title = l; b.hidden = !fsSupported(); }); }
 async function fsToggle(){
+  if (typeof DESK !== 'undefined' && DESK && deskWin()){ try{ const w = deskWin(), f = await w.isFullscreen(); await w.setFullscreen(!f); DESK_FS = !f; }catch(e){ console.warn('plein écran', e); } fsSync(); return; }
   try{
     if (fsActive()){ await (document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen()); }
     else { const d = document.documentElement; await (d.requestFullscreen ? d.requestFullscreen({ navigationUI:'hide' }) : d.webkitRequestFullscreen()); }
@@ -7016,6 +7027,7 @@ async function fsToggle(){
 }
 document.addEventListener('click', ev => { if (ev.target.closest('#fs-toggle, [data-fullscreen]')){ ev.preventDefault(); fsToggle(); } });
 document.addEventListener('fullscreenchange', fsSync); document.addEventListener('webkitfullscreenchange', fsSync);
+if (DESK) window.addEventListener('resize', () => { const w = deskWin(); if (w) w.isFullscreen().then(f => { if (f !== DESK_FS){ DESK_FS = f; fsSync(); } }).catch(() => {}); }); /* plein écran par le bouton vert de la fenêtre */
 /* bouton plein écran : vérifié quand le minuteur est reconstruit (pas à chaque seconde du chrono) */
 let fsRaf = 0; new MutationObserver(() => { if (fsRaf) return; fsRaf = requestAnimationFrame(() => { fsRaf = 0; const want = fsActive() ? 'Quitter le plein écran' : 'Plein écran'; if ([...document.querySelectorAll('.fs-btn')].some(b => b.getAttribute('aria-label') !== want)) fsSync(); }); }).observe(document.getElementById('timer'), { childList:true });
 { const go = () => { bindClEditor(); bindCrEditor(); bindRkEditor(); bindSearch(); init(); fsSync(); maybeToday(); maybeOnboard(); }; if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else setTimeout(go); }

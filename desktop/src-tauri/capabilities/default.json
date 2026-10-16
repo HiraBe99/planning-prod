@@ -2,14 +2,50 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Planning prod : ouvrir le navigateur pour Google, enregistrer les sauvegardes, parler à Google Drive",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
+    "core:window:allow-set-fullscreen",
     "opener:default",
-    { "identifier": "opener:allow-open-url", "allow": [{ "url": "https://accounts.google.com/*" }, { "url": "https://myaccount.google.com/*" }, { "url": "https://hirabe99.github.io/*" }, { "url": "https://github.com/*" }] },
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://accounts.google.com/*"
+        },
+        {
+          "url": "https://myaccount.google.com/*"
+        },
+        {
+          "url": "https://hirabe99.github.io/*"
+        },
+        {
+          "url": "https://github.com/*"
+        }
+      ]
+    },
     "dialog:default",
     "fs:default",
-    { "identifier": "fs:allow-write-file", "allow": [{ "path": "**" }] },
-    { "identifier": "http:default", "allow": [{ "url": "https://*.googleapis.com/*" }, { "url": "https://oauth2.googleapis.com/*" }] }
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [
+        {
+          "path": "**"
+        }
+      ]
+    },
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://*.googleapis.com/*"
+        },
+        {
+          "url": "https://oauth2.googleapis.com/*"
+        }
+      ]
+    }
   ]
 }
