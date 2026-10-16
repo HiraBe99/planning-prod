@@ -130,7 +130,7 @@ html:root[data-theme="circuit"] .next .s-ess{ box-shadow:inset 0 0 0 1px color-m
 /* ----- base ----- */
 :root{ box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
 *,*::before,*::after{ box-sizing:border-box; }
-html{ scroll-padding-top:calc(env(safe-area-inset-top,0px) + 16px); }
+html{ scroll-padding-top:calc(env(safe-area-inset-top,0px) + 16px); scrollbar-gutter:stable; }
 html,body{ margin:0; }
 body{ background:var(--bg); color:var(--text); font-family:var(--font-body); font-size:var(--fs-3); line-height:1.5; font-synthesis:none; -webkit-font-smoothing:antialiased; overflow-wrap:break-word; cursor:default; }
 /* curseur texte seulement là où l'on peut écrire (champs, textes modifiables d'un clic) ; ailleurs la flèche : aucune fausse promesse de saisie */
@@ -614,6 +614,7 @@ button.s-obj, .s-obj{ display:block; width:fit-content; max-width:100%; text-ali
 /* verdict choisi : plein et coloré (vert / ambre / rouge), pour qu'on voie tout de suite lequel est retenu */
 .vd-atteint.on{ background:var(--done); border-color:var(--done); color:var(--bg-panel); }
 .vd-partiel.on{ background:var(--warn); border-color:var(--warn); color:#1A1200; }
+.cr-pick{ grid-template-columns:repeat(2, minmax(0,1fr)); margin-top:var(--s-2); } .vd-cr.on{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); } /* étape 140 */
 .vd-non.on{ background:var(--danger); border-color:var(--danger); color:var(--on-danger, #fff); }
 .vd.on:hover{ filter:brightness(1.06); }
 .report-btn{ justify-self:start; }
@@ -726,7 +727,7 @@ table.t{ width:100%; border-collapse:collapse; font-size:var(--fs-3); }
 .minibar .mb-toggle:hover{ filter:brightness(1.08); } .minibar .mb-toggle svg{ width:16px; height:16px; } .minibar .mb-toggle[aria-label="Reprendre"] svg{ transform:translateX(1px); }
 
 /* ----- minuteur ----- */
-.timer{ position:fixed; inset:0; z-index:50; background:var(--bg); overflow-y:auto; padding:calc(env(safe-area-inset-top,0px) + var(--s-3)) var(--s-4) calc(env(safe-area-inset-bottom,0px) + var(--s-6)); }
+.timer{ position:fixed; inset:0; z-index:50; background:var(--bg); overflow-y:auto; scrollbar-gutter:stable; /* étape 141 : la barre de défilement garde sa place : rien ne bouge d'une étape à l'autre */ padding:calc(env(safe-area-inset-top,0px) + var(--s-3)) var(--s-4) calc(env(safe-area-inset-bottom,0px) + var(--s-6)); }
 .timer-inner{ max-width:calc(var(--page-w) - 32px); margin:0 auto; display:flex; flex-direction:column; }
 .timer-head{ display:flex; justify-content:space-between; gap:var(--s-3); min-height:var(--h-2); }
 .timer-head > div:last-child{ display:flex; align-items:center; gap:var(--s-2); flex:none; }
@@ -1084,6 +1085,9 @@ input[type=range].sl.sl-sm{ height:var(--h-tag); }
 .pj-tpl{ appearance:none; text-align:left; display:flex; flex-direction:column; justify-content:flex-start; gap:var(--s-1); padding:var(--s-3); border:1px solid var(--frame, var(--border)); border-radius:4px; background:var(--bg-panel); color:var(--text); font:inherit; cursor:pointer; }
 .pj-tpl b{ font-size:var(--fs-2); } .pj-tpl small{ font-size:var(--fs-1); color:var(--text-dim); line-height:1.35; }
 .pj-tpl:hover{ border-color:var(--accent); } .pj-tpl.on{ border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); background:var(--accent-soft); }
+.st-sec{ margin-bottom:var(--s-4); } .st-sec h3{ font-size:var(--fs-2); margin:0 0 var(--s-2); } .st-days{ display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:var(--s-1); } .st-days .chip, .st-daws .chip{ min-height:var(--h-2); border-radius:4px; font-weight:600; justify-content:center; }
+.st-daws{ display:flex; flex-wrap:wrap; gap:var(--s-1); } .st-nums{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:var(--s-3); } #st-style{ margin-top:var(--s-2); } /* étape 142 : démarrage */
+#startovl .povl-foot{ justify-content:flex-end; }
 .pj-tpl-def{ font-size:var(--fs-1); font-weight:600; color:var(--accent-text); margin-top:auto; }
 #reserve-form{ grid-template-columns:minmax(0,1fr); } .rs-group{ margin-top:var(--s-3); min-width:0; } .rs-group > summary{ cursor:pointer; display:flex; align-items:center; flex-wrap:wrap; gap:var(--s-1) var(--s-2); min-height:var(--h-1); overflow-wrap:anywhere; min-width:0; } .rs-n{ font-size:var(--fs-1); font-weight:500; color:var(--text-dim); }
 .rs-row{ display:flex; align-items:center; justify-content:space-between; gap:var(--s-2) var(--s-3); flex-wrap:wrap; padding:var(--s-2) 0; border-top:1px solid var(--border); }
@@ -1332,6 +1336,7 @@ input[type=range].sl.sl-sm{ height:var(--h-tag); }
 .save-state{ font-size:var(--fs-1); color:var(--text-dim); white-space:nowrap; }
 .save-state:not(:empty)::before{ content:''; display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--done); margin-right:6px; vertical-align:middle; }
 .save-state.busy::before{ background:var(--warn); }
+.save-state.gd-re{ color:var(--accent); font-weight:600; cursor:pointer; } .save-state.gd-re::before{ background:var(--warn); } /* étape 138 */
 @media (max-width:600px){ .save-state{ white-space:normal; } .brand > *{ min-width:0; } }
 .brand h1{ overflow-wrap:normal; }
 @media (max-width:480px){ .hd-right{ gap:6px; } .hd-right .icon-btn{ width:36px; height:36px; } }
@@ -1661,6 +1666,7 @@ textarea.ai-fill{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-
   .hd-right{ grid-column:3; grid-row:1; align-self:center; }
   .brand-sub{ grid-column:1 / 4; grid-row:2; margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.3; }
   .save-state{ display:none; } /* « Enregistré … » : retiré sur téléphone, à ta demande (la sauvegarde se fait pareil) */
+  .save-state.gd-re{ display:block; } /* sauf « Reconnecter Drive » */
   .meter-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(56px, 1fr)); gap:var(--s-2) var(--s-2); } /* les morceaux sur une seule rangée : nom au-dessus, heures en dessous */
   .meter-mini-label{ flex-direction:column; align-items:flex-start; gap:0; line-height:1.3; }
 }
@@ -2018,6 +2024,7 @@ button.s-jour.s-jour--guess{ color:var(--text-dim); font-style:italic; }
           <button type="button" class="menu-item" id="pause-plan" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5v10M12.5 5v10"/></svg></span><span class="mi-t"><b>Mettre en pause…</b><small>Reprise sans perdre de session</small></span></button>
           <div class="menu-sep"></div>
           <div class="menu-h">Sauvegarde</div>
+          <button type="button" class="menu-item" id="menu-drive" role="menuitem" hidden><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15.5h8.5a3.5 3.5 0 0 0 .4-7 5 5 0 0 0-9.6-1A4 4 0 0 0 6 15.5z"/><path d="M8 11l2-2 2 2M10 9v4.5"/></svg></span><span class="mi-t"><b>Synchroniser avec Google Drive</b><small>Ordinateur et téléphone</small></span></button>
           <button type="button" class="menu-item" id="menu-backup" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5v9M6.5 9l3.5 3.5L13.5 9M4.5 16.5h11"/></svg></span><span class="mi-t"><b>Sauvegarde complète</b><small>Tout le projet en .json</small></span></button>
           <button type="button" class="menu-item" id="menu-backup-sons" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5v8M6.5 8l3.5 3.5L13.5 8"/><path d="M3.5 13.5v3h13v-3"/></svg></span><span class="mi-t"><b>Sauvegarde avec les sons</b><small>Projet + fichiers audio, en .zip</small></span></button>
           <button type="button" class="menu-item" id="menu-restore" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 16.5v-9M6.5 11L10 7.5l3.5 3.5M4.5 3.5h11"/></svg></span><span class="mi-t"><b>Restaurer…</b><small>Depuis une sauvegarde .json ou .zip</small></span></button>
@@ -2085,6 +2092,13 @@ button.s-jour.s-jour--guess{ color:var(--text-dim); font-style:italic; }
   <div class="povl-inner" role="dialog" aria-modal="true" aria-label="Remplir le planning avec une IA">
     <div class="povl-head"><h2>Remplir le planning avec une IA</h2><button type="button" class="icon-btn" id="aifill-close" aria-label="Fermer"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></div>
     <div class="povl-scroll" id="aifill-body"></div>
+  </div>
+</div>
+<div class="povl" id="startovl" hidden>
+  <div class="povl-inner" role="dialog" aria-modal="true" aria-label="Bienvenue">
+    <div class="povl-head"><h2>Bienvenue</h2><button type="button" class="icon-btn" data-st-close aria-label="Fermer"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></div>
+    <div class="povl-scroll" id="start-body"></div>
+    <div class="povl-foot"><button type="button" class="btn" data-st-close>Explorer l'exemple</button><button type="button" class="btn btn-primary" id="st-go">Créer mon planning</button></div>
   </div>
 </div>
 <div class="povl" id="searchovl" hidden>
@@ -2554,6 +2568,112 @@ function toast(msg, act){ const t = document.getElementById('toast'); t.textCont
   if (act){ const b = document.createElement('button'); b.type = 'button'; b.className = 'toast-act'; b.textContent = act.label; b.onclick = () => { t.hidden = true; act.fn(); }; t.appendChild(b); }
   t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, act ? 9000 : 2400); }
 
+/* ----- étape 138 : hors de Claude, synchronisation par Google Drive -----
+ Chaque personne relie SON Drive : un dossier « Planning prod (données) » y est créé, un fichier .json par document (mêmes documents que dans Claude).
+ Accès limité aux fichiers créés par l'outil (drive.file). Jeton Google valable 1 h ; ensuite « Reconnecter Drive » (un clic) : en attendant, tout reste sur l'appareil. */
+const GD_CLIENT = '511559938654-36jg2htngdt09v7bhfrd467or86kq04n.apps.googleusercontent.com', GD_SCOPE = 'https://www.googleapis.com/auth/drive.file', GD_LS = 'dnb-gd-v1', GD_DIR = 'Planning prod (données)';
+const GD = { st: (() => { const v = readLS(GD_LS); return isObj(v) ? v : {}; })(), tc:null, wait:null, ids:{}, cache:{}, gis:null };
+const GD_ON = () => !window.claude && /^https?:$/.test(location.protocol);
+const gdTok = () => !!(GD.st.tok && Date.now() < (+GD.st.exp || 0) - 60000), gdOk = () => !!(GD.st.on && gdTok());
+const gdNeed = () => !!(GD_ON() && GD.st.on && !gdOk());
+function gdSaveSt(){ writeLS(GD_LS, GD.st); }
+const GAPI = 'https://www.googleapis.com/drive/v3/files', GUP = 'https://www.googleapis.com/upload/drive/v3/files';
+async function gdF(url, o = {}){ if (!gdTok()){ renderSaveState(); throw { code:'auth' }; }
+  let r; try{ r = await fetch(url, Object.assign({}, o, { headers: Object.assign({ Authorization:'Bearer ' + GD.st.tok }, o.headers || {}) })); }catch(e){ throw { code:'offline' }; }
+  if (r.status === 401){ GD.st.tok = null; gdSaveSt(); renderSaveState(); gdMenu(); throw { code:'auth' }; }
+  if (r.status === 404) throw { code:'not_found' };
+  if (!r.ok){ const t = await r.text().catch(() => ''); throw { code: r.status === 429 || r.status >= 500 || /rateLimit/i.test(t) ? 'unavailable' : 'http_' + r.status, message:t.slice(0, 200) }; }
+  return r; }
+const gdQ = x => String(x).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+const gdNewest = l => l.slice().sort((a, b) => String(b.modifiedTime).localeCompare(String(a.modifiedTime)));
+async function gdList(q){ let out = [], pt = ''; do { const r = await (await gdF(GAPI + '?pageSize=1000&spaces=drive&fields=nextPageToken,files(id,name,modifiedTime)&q=' + encodeURIComponent(q) + (pt ? '&pageToken=' + encodeURIComponent(pt) : ''))).json(); out = out.concat(r.files || []); pt = r.nextPageToken || ''; } while (pt); return out; }
+async function gdFolder(){ if (GD.st.fid) return GD.st.fid;
+  const l = gdNewest(await gdList("name='" + gdQ(GD_DIR) + "' and mimeType='application/vnd.google-apps.folder' and trashed=false"));
+  let id = l.length ? l[l.length - 1].id : null; /* le plus ancien : le même sur tous les appareils */
+  if (!id) id = (await (await gdF(GAPI + '?fields=id', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ name:GD_DIR, mimeType:'application/vnd.google-apps.folder' }) })).json()).id;
+  GD.st.fid = id; gdSaveSt(); return id; }
+const gdName = p => String(p).replace(/^data\/users\/[^/]+\//, '').replace(/\//g, '_') + '.json';
+async function gdRead(f){ const c = GD.cache[f.id]; if (c && f.modifiedTime && c.mt === f.modifiedTime) return c.d;
+  const d = await (await gdF(GAPI + '/' + f.id + '?alt=media')).json(); if (f.modifiedTime) GD.cache[f.id] = { mt:f.modifiedTime, d }; return d; }
+async function gdId(n){ if (GD.ids[n]) return GD.ids[n]; const fid = await gdFolder();
+  const l = gdNewest(await gdList("name='" + gdQ(n) + "' and '" + fid + "' in parents and trashed=false")); if (l.length) GD.ids[n] = l[0].id; return GD.ids[n] || null; }
+const gdDb = {
+  doc: p => { const n = gdName(p); return {
+    get: async () => { const id = await gdId(n); if (!id) return { exists:false, data:() => undefined };
+      try{ const d = await gdRead({ id }); return { exists:true, data:() => d }; }catch(e){ if (e.code === 'not_found'){ delete GD.ids[n]; return { exists:false, data:() => undefined }; } throw e; } },
+    set: async data => { const body = JSON.stringify(data); let id = await gdId(n);
+      if (id){ try{ await gdF(GUP + '/' + id + '?uploadType=media', { method:'PATCH', headers:{ 'Content-Type':'application/json' }, body }); return; }catch(e){ if (e.code !== 'not_found') throw e; delete GD.ids[n]; } }
+      const fid = await gdFolder(), bd = 'pp' + Math.random().toString(36).slice(2);
+      const mp = '--' + bd + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify({ name:n, parents:[fid], mimeType:'application/json' }) + '\r\n--' + bd + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + body + '\r\n--' + bd + '--';
+      GD.ids[n] = (await (await gdF(GUP + '?uploadType=multipart&fields=id', { method:'POST', headers:{ 'Content-Type':'multipart/related; boundary=' + bd }, body:mp })).json()).id; },
+    delete: async () => { const id = await gdId(n); if (!id) return; try{ await gdF(GAPI + '/' + id, { method:'DELETE' }); }catch(e){ if (e.code !== 'not_found') throw e; } delete GD.ids[n]; delete GD.cache[id]; } }; },
+  /* tout le dossier : chaque document lu une fois (relu seulement s'il a changé) ; les copies de secours (snap_*) ne sont lues qu'à la demande */
+  collection: () => ({ limit: () => ({ get: async () => { const fid = await gdFolder(), all = gdNewest(await gdList("'" + fid + "' in parents and trashed=false")), m = {};
+    all.forEach(f => { if (!m[f.name]) m[f.name] = f; }); GD.ids = {}; Object.keys(m).forEach(n => { GD.ids[n] = m[n].id; });
+    const names = Object.keys(m).filter(n => /\.json$/.test(n) && !/^snap_/.test(n)), docs = []; let i = 0;
+    const run = async () => { while (i < names.length){ const n = names[i++]; try{ const d = await gdRead(m[n]); docs.push({ id:n.replace(/\.json$/, ''), exists:true, data:() => d }); }catch(e){ if (e.code !== 'not_found') throw e; } } };
+    await Promise.all([run(), run(), run(), run(), run(), run()]); return { docs }; } }) })
+};
+/* étape 139 : sons et images sur Drive (sous-dossier « sons ») ; repère « gd:<id> » dans it.asset ; l'original part tel quel, sans limite de taille */
+async function gdSons(){ if (GD.st.sid) return GD.st.sid; const fid = await gdFolder();
+  const l = gdNewest(await gdList("name='sons' and mimeType='application/vnd.google-apps.folder' and '" + fid + "' in parents and trashed=false"));
+  let id = l.length ? l[l.length - 1].id : null;
+  if (!id) id = (await (await gdF(GAPI + '?fields=id', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ name:'sons', mimeType:'application/vnd.google-apps.folder', parents:[fid] }) })).json()).id;
+  GD.st.sid = id; gdSaveSt(); return id; }
+const gdAssets = {
+  upload: async (blob, o) => { const type = (o && o.type) || blob.type || 'application/octet-stream', sid = await gdSons();
+    const r = await gdF(GUP + '?uploadType=resumable&fields=id', { method:'POST', headers:{ 'Content-Type':'application/json; charset=UTF-8', 'X-Upload-Content-Type':type }, body: JSON.stringify({ name: blob.name || 'fichier', parents:[sid] }) });
+    const loc = r.headers.get('Location'); if (!loc) throw { code:'upload' };
+    let r2; try{ r2 = await fetch(loc, { method:'PUT', headers:{ 'Content-Type':type }, body:blob }); }catch(e){ throw { code:'offline' }; }
+    if (!r2.ok) throw { code:'http_' + r2.status }; const j = await r2.json(); return { id:'gd:' + j.id, sizeBytes:blob.size, contentType:type }; },
+  delete: async ref => { ref = String(ref || ''); if (ref.indexOf('gd:') !== 0) return { deleted:false }; try{ await gdF(GAPI + '/' + ref.slice(3), { method:'DELETE' }); return { deleted:true }; }catch(e){ if (e.code === 'not_found') return { deleted:false }; throw e; } }
+};
+/* fichier stocké : dans Claude « /_blob/<id> », sur Drive le fichier lui-même ; jamais d'exception (réponse « pas ok » à la place) */
+async function assetGet(id){ id = String(id || ''); try{ if (id.indexOf('gd:') === 0) return await gdF(GAPI + '/' + encodeURIComponent(id.slice(3)) + '?alt=media'); return await fetch('/_blob/' + id); }catch(e){ return { ok:false, status:0 }; } }
+const gdAssetsOn = () => !window.claude && GD_ON() && !!GD.st.on;
+async function dbBackend(){
+  if (window.claude && window.claude.use){ const d = await window.claude.use('db'); if (!d) return null; const u = await window.claude.use('user'); const uid = u && u.id ? await u.id().catch(() => null) : null; return uid ? { d, uid } : null; }
+  if (!GD_ON() || !gdOk() || !GD.st.uid) return null;
+  return { d:gdDb, uid:GD.st.uid };
+}
+/* bibliothèque de connexion Google : chargée d'avance (le clic doit ouvrir la fenêtre Google tout de suite, sinon le navigateur la bloque) */
+function gdGis(){ if (GD.gis) return GD.gis; GD.gis = new Promise((ok, ko) => { if (window.google && window.google.accounts && window.google.accounts.oauth2) return ok();
+  const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; sc.onload = () => ok(); sc.onerror = () => { GD.gis = null; ko(new Error('Google indisponible')); }; document.head.appendChild(sc); }); return GD.gis; }
+function gdTc(){ if (GD.tc) return GD.tc; if (!(window.google && window.google.accounts && window.google.accounts.oauth2)) return null;
+  const done = (r, bad) => { const w = GD.wait; GD.wait = null; if (w) (bad || !r || !r.access_token ? w.ko(r || {}) : w.ok(r)); };
+  GD.tc = window.google.accounts.oauth2.initTokenClient({ client_id:GD_CLIENT, scope:GD_SCOPE, callback: r => done(r, !!(r && r.error)), error_callback: e => done(e, true) }); return GD.tc; }
+async function gdConnect(){
+  const tc = gdTc(); if (!tc){ toast('Connexion à Google impossible pour l\'instant'); gdGis().catch(() => {}); return; }
+  const first = !GD.st.on || !GD.st.uid;
+  const p = new Promise((ok, ko) => { GD.wait = { ok, ko }; }); tc.requestAccessToken(Object.assign({ prompt: first ? 'consent' : '' }, GD.st.email ? { login_hint:GD.st.email } : {}));
+  let r; try{ r = await p; }catch(e){ if (!e || e.type !== 'popup_closed') toast('Connexion à Google Drive annulée'); return; }
+  if (window.google.accounts.oauth2.hasGrantedAllScopes && !window.google.accounts.oauth2.hasGrantedAllScopes(r, GD_SCOPE)){ toast('Accès à Google Drive refusé'); return; }
+  GD.st.tok = r.access_token; GD.st.exp = Date.now() + (+r.expires_in || 3600) * 1000;
+  try{ const a = await (await gdF('https://www.googleapis.com/drive/v3/about?fields=user(permissionId,emailAddress)')).json(), u = a.user || {};
+    if (u.permissionId && u.permissionId !== GD.st.uid){ GD.st.fid = null; GD.ids = {}; GD.cache = {}; }
+    GD.st.uid = u.permissionId || GD.st.uid || 'drive'; if (u.emailAddress) GD.st.email = u.emailAddress;
+  }catch(e){ console.warn('drive', e); GD.st.tok = null; gdSaveSt(); toast('Google Drive ne répond pas'); return; }
+  if (first) keepSnapshot(stateBundle('Avant la synchronisation Google Drive'));
+  GD.st.on = 1; gdSaveSt(); gdMenu(); saveState('sync');
+  lastPull = Date.now(); await initDbInner({ refresh:true });
+  if (first && db){ /* première liaison : tout ce qui est sur l'appareil (déjà fusionné avec le Drive) y est envoyé */
+    dbSave('progress/state', () => progress, true); dbSave('meta/suivi', () => meta, true);
+    const vu = new Set(); Object.keys(journal).forEach(id => { const k = jChunk(id); if (vu.has(k)) return; vu.add(k); dbSave('journal/' + id, () => journal[id] || {}, true); }); }
+  Object.values(RETRY).forEach(x => { clearTimeout(x.t); x.f(); });
+  if (!Object.keys(pendingSaves).length && !Object.keys(RETRY).length) saveState('ok');
+  toast(first ? 'Google Drive connecté' : 'Google Drive reconnecté'); gdQueueSons(); }
+/* sons pas encore sur Drive (importés avant la liaison, ou pendant une coupure) : envoyés en arrière-plan si la synchro automatique est active */
+function gdQueueSons(){ try{ if (!gdAssetsOn() || !encAuto()) return; const A = auMeta(); Object.keys(A.items || {}).forEach(aid => { if (encNeeds(aid) && AU.has[aid] !== false) encQueue(aid); }); }catch(e){ console.warn('sons drive', e); } }
+async function gdMenuClick(){
+  if (!GD.st.on){ gdConnect(); return; }
+  if (gdNeed()){ gdConnect(); return; }
+  const v = await askDialog('Google Drive', GD.st.email || '', [{ label:'Synchroniser maintenant', value:'s', primary:true }, { label:'Déconnecter', value:'d' }, { label:'Fermer', value:null }]);
+  if (v === 's'){ flushSaves(); lastPull = Date.now(); saveState('sync'); await initDbInner({ refresh:true }); if (!Object.keys(pendingSaves).length && !Object.keys(RETRY).length) saveState('ok'); }
+  if (v === 'd'){ flushSaves(); try{ if (GD.st.tok && window.google) window.google.accounts.oauth2.revoke(GD.st.tok, () => {}); }catch(e){}
+    GD.st = { email:GD.st.email }; gdSaveSt(); GD.ids = {}; GD.cache = {}; db = null; DBP = null; saveState('local'); gdMenu(); toast('Google Drive déconnecté : tout reste sur cet appareil'); } }
+function gdMenu(){ const b = document.getElementById('menu-drive'); if (!b) return; b.hidden = !GD_ON(); if (b.hidden) return;
+  b.querySelector('b').textContent = !GD.st.on ? 'Synchroniser avec Google Drive' : gdNeed() ? 'Reconnecter Google Drive' : 'Google Drive · connecté';
+  b.querySelector('small').textContent = GD.st.on && GD.st.email ? GD.st.email : 'Ordinateur et téléphone'; }
 /* ----- persistence ----- */
 const TS_KEY = 'dnb-planning-ts-v1';
 const pendingSaves = {};
@@ -2564,7 +2684,9 @@ function saveState(st){ SAVE_ST = st; if (st !== 'sync' && st !== 'pending') SAV
 function renderSaveState(){
   const el = document.getElementById('save-state'); if (!el) return;
   let txt, cls = 'save-state', title = null;
-  if (SAVE_ST === 'pending' || SAVE_ST === 'sync'){ txt = 'Enregistrement…'; cls = 'save-state busy'; }
+  let gdRe = false; try{ gdRe = gdNeed(); }catch(e){} /* avant la mise en place de Drive (tout début du chargement) : non */
+  if (gdRe){ txt = 'Reconnecter Drive'; cls = 'save-state gd-re'; title = 'Google Drive : cliquer pour reconnecter (en attendant, tout est gardé sur cet appareil)'; }
+  else if (SAVE_ST === 'pending' || SAVE_ST === 'sync'){ txt = 'Enregistrement…'; cls = 'save-state busy'; }
   else if (SAVE_NOTE && Date.now() < SAVE_NOTE.until) txt = SAVE_NOTE.text;
   else if (!SAVE_AT) txt = 'Enregistré';
   else {
@@ -2577,6 +2699,7 @@ function renderSaveState(){
   }
   /* la page n'est modifiée que si l'affichage change */
   if (el.textContent !== txt) el.textContent = txt; if (el.className !== cls) el.className = cls; if (title !== null && el.title !== title) el.title = title;
+  const re = cls.indexOf('gd-re') >= 0; if (re !== (el.getAttribute('role') === 'button')){ if (re){ el.setAttribute('role', 'button'); el.tabIndex = 0; } else { el.removeAttribute('role'); el.removeAttribute('tabindex'); } }
 }
 /* mise à jour toutes les 5 s, seulement quand la page est visible ; premier affichage dès le chargement */
 let SAVE_TICK = 0;
@@ -2597,7 +2720,9 @@ const WQ = {};
 function queueWrite(wpath, op){ const p = (WQ[wpath] || Promise.resolve()).then(op); WQ[wpath] = p.catch(() => {}); return p; }
 const RETRY = {};
 /* échec passager : nouvel essai, de plus en plus espacé (5 min au plus) */
-function dbFail(where, e, refaire, essai){ console.error('save', where, e); saveState('local'); const c = e && e.code;
+function dbFail(where, e, refaire, essai){ const c = e && e.code; if (c === 'offline' && refaire && db){ saveState('local'); const f = () => refaire(essai + 1); RETRY[where] = { f, t:setTimeout(f, Math.min(300000, 2000 * 2 ** essai) * (0.5 + Math.random())) }; return; } /* sans réseau : nouvel essai, sans alerte */
+  if (c === 'auth'){ saveState('local'); if (refaire){ const f = () => refaire(essai + 1); RETRY[where] = { f, t:setTimeout(f, 600000) }; } renderSaveState(); return; } /* étape 138 : Drive à reconnecter : l'envoi repartira à la reconnexion */
+  console.error('save', where, e); saveState('local');
   if (/^(invalid_argument|revoked|not_granted|capability_disabled|capability_removed|transform_error)$/.test(c)) db = null; /* pas le droit d'écrire : tout reste sur l'appareil */
   else if (refaire && c !== 'quota_exceeded'){ const f = () => refaire(essai + 1); RETRY[where] = { f, t:setTimeout(f, Math.min(300000, 2000 * 2 ** essai) * (0.5 + Math.random())) }; }
   if (e && e.code === 'quota_exceeded'){ if (!dbFail.q){ dbFail.q = true; toast('Espace de synchronisation plein : ton planning reste enregistré sur cet appareil. Une « Sauvegarde complète » (menu ⋯) le met à l\'abri.'); } return; }
@@ -2755,6 +2880,14 @@ const saveMeta = (now) => { horodaterMeta(); dbSave('meta/suivi', () => meta, no
 
 /* étape 85 : ce que la fusion de démarrage doit renvoyer à la base part dès que la synchronisation de démarrage est finie (avant : au prochain enregistrement seulement) */
 const INIT_UPS = []; function upLater(path, get){ if (DB_DONE) dbSave(path, get, true); else INIT_UPS.push([path, get]); }
+
+/* démarrage hors Claude : menu, bibliothèque Google (préparée d'avance), clic sur « Reconnecter Drive » */
+(() => { if (window.claude) return;
+  try{ gdMenu(); if (GD_ON()){ const pre = () => gdGis().then(gdTc).catch(() => {}); if (GD.st.on) pre(); else { const mb = document.getElementById('menu-btn'); if (mb) mb.addEventListener('click', pre, { once:true }); } renderSaveState();
+    const ss = document.getElementById('save-state'), go = ev => { if (gdNeed() && (ev.type === 'click' || ev.key === 'Enter' || ev.key === ' ')){ ev.preventDefault(); gdConnect(); } };
+    if (ss){ ss.addEventListener('click', go); ss.addEventListener('keydown', go); }
+    if (gdOk()) setTimeout(gdQueueSons, 8000); } }catch(e){ console.warn('drive', e); }
+})();
 async function initDb(){ try{ await initDbInner(); } finally { DB_DONE = true; INIT_UPS.splice(0).forEach(([p, g]) => { try{ dbSave(p, g, true); }catch(e){ console.error('synchronisation', p, e); } }); firstRunAlign(); setTimeout(() => { try{ trashPurge(); }catch(e){} }, 20000); } } /* corbeille vidée après la première synchro */
 /* synchronisation par compte : chaque personne a son espace privé « data/users/<son id>/ » (invisible des autres, propriétaire compris).
  Ordinateur et téléphone connectés au même compte voient donc le même planning ; sans compte ou sans droit d'écriture, tout reste sur l'appareil. */
@@ -2783,9 +2916,7 @@ function dp(path){
 async function initDbInner(opts){
   const refresh = !!(opts && opts.refresh); let before = '';
   try{
-    if (!window.claude || !window.claude.use) return;
-    const d = await window.claude.use('db'); if (!d) return;
-    const u = await window.claude.use('user'); const uid = u && u.id ? await u.id().catch(() => null) : null; if (!uid) return;
+    const bk = await dbBackend(); if (!bk) return; const d = bk.d, uid = bk.uid;
     DBP = 'data/users/' + uid + '/'; db = d;
     const coll = await db.collection('data/users/' + uid).limit(1000).get();
     let docs = coll.docs.slice();
@@ -3140,7 +3271,7 @@ function firstRunAlign(){
   if (meta.settings || meta.startMode || hasSessionData() || Object.keys(meta.overrides || {}).length || (meta.shifts || []).length) return;
   alignStartFrom(todayISO(), settings().days, 'auto'); saveMeta(true); firstRender = true; renderAll();
 }
-function computeResume(id, dateISO, pin, keepPrev){
+function computeResume(id, dateISO, pin, keepPrev, force){
   const X = BY_ID[id], k0 = X.idx, day = parseISO(dateISO), off = slotOff(); if (X.buffer){ planBuffer(id, dateISO); return; }
   const sl = s => (s.slot != null ? s.slot : s.idx);
   const old = ALL.map(s => shiftSlots(meta.shifts, s.idx));
@@ -3153,7 +3284,7 @@ function computeResume(id, dateISO, pin, keepPrev){
   const nw = ALL.map(s => shiftSlots(meta.shifts, s.idx)); const ov = Object.assign({}, meta.overrides || {});
   Object.keys(ov).forEach(key => { const s = BY_ID[key]; if (!s || s.idx === k0) return; if (nw[s.idx] === old[s.idx]) return;
     if (s.buffer) return; const days = Math.round((slotDate(sl(s) + off + nw[s.idx]) - slotDate(sl(s) + off + old[s.idx])) / 86400000); ov[key] = isoOf(addDays(parseISO(ov[key]), days)); });
-  if (pin && isoOf(slotDate(n)) !== dateISO) ov[id] = dateISO; else delete ov[id];
+  if (pin && (force || isoOf(slotDate(n)) !== dateISO)) ov[id] = dateISO; else delete ov[id]; /* étape 143 : date choisie à la main (force) : gardée, même si c'est son jour normal ; sinon « en avance » la ramenait à aujourd'hui */
   meta.overrides = ov; meta.resumeIdx = k0;
 }
 function migrateMeta(){
@@ -3170,9 +3301,9 @@ function migrateMeta(){
 }
 /* capacité de chaque jour : 1h ou 2h selon les réglages */
 function dayCaps(){ const st = settings(), cap = {}; st.days.forEach((d, i) => { const c = slotMinutesAt(i) / 60; cap[d] = Math.max(cap[d] || 0, c); }); return cap; }
-function resumeFrom(id, dateISO, markPrev, pin){
+function resumeFrom(id, dateISO, markPrev, pin, force){
   { const x = BY_ID[id]; if (x) planLog('Date changée : ' + x.bloc + ' du ' + dayShort(x.date) + ' au ' + dayShort(dateISO) + ', et toutes les suivantes'); }
-  computeResume(id, dateISO, pin !== false);
+  computeResume(id, dateISO, pin !== false, false, !!force);
   if (progress[id] && progress[id].done){ entry(id).done = false; }
   if (markPrev){ const k0 = BY_ID[id].idx; for (let k = 0; k < k0; k++){ const s = ALL[k]; if (s.timer) entry(s.id).done = true; } }
   saveProgress();
@@ -3314,7 +3445,7 @@ function freeDay(s, limit){
   for (let g = 0; g < 21; g++, d = addDays(d, 1)){ const iso = isoOf(d); if (limit && iso >= limit) return ''; if ((cap[d.getDay()] || 0) + 1e-9 >= (s.duree || 0) && !fait.has(iso)) return iso; }
   return ''; }
 function aheadDay(s){
-  if (!s || s.extra || s.reserve || s.free || s.moved || (progress[s.id] && progress[s.id].done)) return '';
+  if (!s || s.extra || s.reserve || s.free || s.moved || (meta.overrides || {})[s.id] || (progress[s.id] && progress[s.id].done)) return ''; /* étape 143 : une date posée à la main (même son jour normal) n'est jamais avancée */
   const ns = nextSession(); if (!ns || ns.id !== s.id) return '';
   const td = todayISO(); if (!s.date || s.date <= td) return '';
   if (s.id === timerSid()) return td;
@@ -3420,7 +3551,7 @@ function sessionHtml(s){
   const rel = e.done ? 'done' : dd < td ? 'late' : dd === td ? 'today' : 'future';
   const off = s.extra && !s.prolong ? '<span class="rel rel-extra">Ponctuelle</span>' : s.extra ? '' : s.moved ? '<span class="rel rel-off" title="' + esc('Prévue le ' + shortD(parseISO(s.planned)) + (dayIssue(s.date, s.duree) ? ' · ' + dayIssue(s.date, s.duree) : '')) + '">Date modifiée</span>' : '';
   const relTag = off + (e.done ? (() => { /* étape 98 : une seule ligne : le temps de travail entre dans « Fait » ; plus d'étiquette « Date réelle inconnue » (gardé en infobulle) */
-      const tip = [s.doneMoved ? 'Prévue le ' + shortD(parseISO(s.planned)) : '', mins ? fmtDur(mins) + ' de travail dans le minuteur' : '', crTxt(e), s.doneEst ? 'Jour non noté : ce jour-là au plus tard' : !s.doneReal && !s.extra && s.date > todayISO() ? 'Faite avant que l\'outil note le jour où tu travailles : elle garde sa date prévue' : ''].filter(Boolean).join(' · ');
+      const tip = [s.doneMoved ? 'Prévue le ' + shortD(parseISO(s.planned)) : '', mins ? fmtDur(mins) + ' de travail dans le minuteur' : '', crTxt(s.id), s.doneEst ? 'Jour non noté : ce jour-là au plus tard' : !s.doneReal && !s.extra && s.date > todayISO() ? 'Faite avant que l\'outil note le jour où tu travailles : elle garde sa date prévue' : ''].filter(Boolean).join(' · ');
       /* étape 109 : même forme sur toutes les lignes : « Fait · temps » ; le jour est toujours dans la colonne « date » */
       return '<span class="rel rel-done"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>Fait' + (mins ? ' · ' + fmtDur(mins) : '') + '</span>'; })() : rel === 'late' ? '<span class="rel rel-late">En retard</span>' : rel === 'today' ? '<span class="rel rel-today">Aujourd\'hui</span>' : dd === tm ? '<span class="rel rel-soon">Demain</span>' : '');
   return '<div class="session-row' + (e.done ? ' is-done' : '') + ' is-' + rel + ((e.done || dd < td) ? ' is-pastdate' : dd > td ? ' is-upcoming' : '') + '" data-id="' + s.id + '"' + (lite && !s.essentiel ? ' hidden' : '') + '>' +
@@ -3714,7 +3845,7 @@ function resultHtml(id){
   return '<div class="j-sec">Résultat</div>' +
     (cs.length ? '<div class="res-crit">' + cs.map(x => '<label class="plan-check"><input type="checkbox" data-crok="' + x.i + '"' + (p.critOk[x.i] ? ' checked' : '') + '><span>' + esc(x.c) + '</span></label>').join('') + '</div>'
                : '') + 
-    '<div class="verdict" role="group" aria-label="Verdict">' + V.map(([k, l]) => '<button type="button" class="vd vd-' + k + (j.verdict === k ? ' on' : '') + '" data-verdict="' + k + '" aria-pressed="' + (j.verdict === k) + '">' + l + '</button>').join('') + '</div>' +
+    '<div class="verdict" role="group" aria-label="Verdict">' + V.map(([k, l]) => '<button type="button" class="vd vd-' + k + (j.verdict === k ? ' on' : '') + '" data-verdict="' + k + '" aria-pressed="' + (j.verdict === k) + '">' + l + '</button>').join('') + '</div>' + crPickHtml(id) +
     '<button type="button" class="btn report-btn" data-report="' + id + '"' + ((j.verdict === 'partiel' || j.verdict === 'non') ? '' : ' hidden') + '>' + I.cal + ' Reporter le but…</button>' +
     '<label class="f ecart"' + ((j.verdict === 'partiel' || j.verdict === 'non') ? '' : ' hidden') + '>Écart restant<textarea rows="1" class="grow" data-jf="ecart" placeholder="Ce qui manque encore pour atteindre la cible (devient ta prochaine action)">' + esc(j.ecart) + '</textarea></label>';
 }
@@ -3744,7 +3875,7 @@ function journalFormHtml(id, opts){
     '<div class="j-sec">Évaluation<button type="button" class="icon-btn fmt-more meth-edit" data-rk-edit aria-label="Modifier les éléments notés" title="Modifier les éléments notés"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><circle cx="4.5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15.5" cy="10" r="1.6"/></svg></button></div>' +
     '<div class="ratings">' + (rkFor(id).length ? '' : '<div class="res-empty">Aucun élément à noter : ajoute-les avec le bouton « … ».</div>') + rkFor(id).map(k => '<div class="rating-line"><span>' + esc(capTxt(k, 30)) + '</span><div class="dots">' + [1,2,3,4,5].map(n => '<button type="button" class="dot' + (r[k] === n ? ' on' : '') + (r[k] >= n ? ' fill' : '') + '" data-rk="' + esc(k) + '" data-rv="' + n + '" aria-label="' + esc(k) + ' ' + n + '">' + n + '</button>').join('') + '</div></div>').join('') + '</div>' +
     (opts && opts.noMinutes ? '<div class="j-sec j-sec-notes"><span>Notes</span><span class="j-attach" data-ni="' + id + '">' + (niList(id).length < NI_MAX ? '<button type="button" class="ni-add" data-ni-add title="Ajouter une image (ou colle une capture dans les notes)">+ Image</button>' : '') + memoBoxHtml(BY_ID[id]) + '</span></div>' : '<div class="j-sec">Temps et notes</div>') +
-    (opts && opts.noMinutes ? '' : '<label class="f">Temps réellement travaillé (min)<input type="text" data-dur data-pf="minutes" value="' + (e.minutes || '') + '" class="short" placeholder="min" title="Minutes, ou 1h30, 2h…"></label>') + (crTxt(e) && !(opts && opts.noMinutes) ? '<p class="cr-sum">' + esc(crTxt(e)) + '</p>' : '') +
+    (opts && opts.noMinutes ? '' : '<label class="f">Temps réellement travaillé (min)<input type="text" data-dur data-pf="minutes" value="' + (e.minutes || '') + '" class="short" placeholder="min" title="Minutes, ou 1h30, 2h…"></label>') + (crTxt(id) && !(opts && opts.noMinutes) ? '<p class="cr-sum">' + esc(crTxt(id)) + '</p>' : '') +
     /* sous le titre « Notes » : le champ seul, qui grandit avec le texte */
     (opts && opts.noMinutes ? '<label class="f"><textarea rows="1" class="grow" data-pf="notes" aria-label="Notes libres" placeholder="Idées, réglages à retenir, références…">' : '<label class="f">Notes libres<textarea rows="1" class="grow" data-pf="notes" placeholder="Idées, réglages à retenir, références…">') + esc(e.notes) + '</textarea></label>' + (opts && opts.noMinutes ? niHtml(id, 1).replace(/<button type="button" class="ni-add"[^>]*>\+ Image<\/button>/, '') : niHtml(id, 1)) + '</div>';
 }
@@ -4088,6 +4219,9 @@ function bindJournal(root){
     if (ev.target.dataset.pf){ if (ev.target.dataset.pf === 'minutes') setMinutes(id, parseDur(ev.target.value) || 0); else entry(id)[ev.target.dataset.pf] = ev.target.value; saveProgress(); } /* étape 85 : temps tapé à la main = nouvelle base */
   });
   root.addEventListener('click', ev => {
+    const ck = ev.target.closest('[data-crk]'); if (ck){ const box = ck.closest('.journal'), id = box && box.dataset.jid; if (!id) return; const j = jEntry(id), k = j.crk || '', x = ck.dataset.crk;
+      const n = k.indexOf(x) >= 0 ? k.replace(x, '') : k + x; j.crk = ['c', 'r'].filter(y => n.indexOf(y) >= 0).join(''); saveJournal(id);
+      box.querySelectorAll('[data-crk]').forEach(b => { const on = j.crk.indexOf(b.dataset.crk) >= 0; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); }); try{ renderSuivi(); }catch(e){} return; }
     const vd = ev.target.closest('[data-verdict]'); if (!vd) return; const box = vd.closest('.journal'); const id = box.dataset.jid; const j = jEntry(id);
     j.verdict = j.verdict === vd.dataset.verdict ? '' : vd.dataset.verdict; j.verdictAuto = false; saveJournal(id);
     box.querySelectorAll('[data-verdict]').forEach(b => { b.classList.toggle('on', b.dataset.verdict === j.verdict); b.setAttribute('aria-pressed', String(b.dataset.verdict === j.verdict)); });
@@ -4263,8 +4397,8 @@ function crItems(){ return (!meta.project && Array.isArray(meta.crItems)) ? meta
 function clItems(){ return (!meta.project && Array.isArray(meta.clItems)) ? meta.clItems : D.checklist; }
 let clEditing = false;
 /* étape 135 : part du temps passé à créer, semaine par semaine (sessions où tu as utilisé « Créer / Régler ») */
-function crWeeksHtml(){ const W = {}; ALL.forEach(s => { const e = progress[s.id]; if (!isObj(e) || !isObj(e.cr) || !s.date) return; const d = parseISO(s.date), mon = isoOf(addDays(d, -((d.getDay() + 6) % 7)));
-    const w = W[mon] = W[mon] || { c:0, r:0 }; w.c += +e.cr.c || 0; w.r += +e.cr.r || 0; });
+function crWeeksHtml(){ const W = {}; ALL.forEach(s => { const x = crOf(s.id); if (!x || !s.date) return; const d = parseISO(s.date), mon = isoOf(addDays(d, -((d.getDay() + 6) % 7)));
+    const w = W[mon] = W[mon] || { c:0, r:0 }; w.c += x.c; w.r += x.r; });
   const ks = Object.keys(W).filter(k => W[k].c + W[k].r > 0).sort().slice(-8); if (!ks.length) return '';
   return '<p class="stat-line cr-weeks">Créé : ' + ks.map(k => '<span>sem. du ' + esc(shortD(parseISO(k))) + ' <b>' + Math.round(100 * W[k].c / (W[k].c + W[k].r)) + ' %</b></span>').join(' · ') + '</p>'; }
 function renderSuivi(){
@@ -4506,14 +4640,15 @@ function renderRecap(){ const el = document.getElementById('week-recap'); if (!e
     cell(String(open), piste ? 'Problème' + (open > 1 ? 's' : '') + ' à régler · ' + esc(pName(piste)) : 'Problèmes à régler') + '</div>' +
     (jal ? '<div class="recap-j">' + I.flag + ' <b>Prochain jalon</b> ' + esc(jal.jalon) + ' <span>· ' + esc(jal.jourAbbr + ' ' + jal.dateLabel) + '</span></div>' : '') + '</div>'; }
 document.addEventListener('click', ev => { if (!(ev.target.closest && ev.target.closest('[data-recap-ok]'))) return; meta.recapSeen = weekMonday(new Date()); saveMeta(); renderRecap(); });
-function persistTimer(){ if (!T) { try{ localStorage.removeItem(LS_T); }catch{} return; } writeLS(LS_T, { fp:T.fp || null, started:!!T.started, id:T.id, key:T.key, jp:!!T.jp, startedAt:T.startedAt, rit:T.rit || null, add:T.add || null, idx:T.idx, remaining: remainingMs(), active:T.active, finished:T.finished, cm:T.cm || 'c', crt:T.crt || null, cru:!!T.cru }); }
-/* étape 135 : « Créer / Régler » : un bouton dans le minuteur ; le temps qui passe va dans l'un ou l'autre. Gardé avec la session seulement si tu t'en es servi. */
-function crSegHtml(){ const m = k => Math.floor(((T.crt || {})[k] || 0) / 60000), on = T.cm === 'r' ? 'r' : 'c';
-  return '<div class="cr-seg"><span class="seg-ctl" role="group" aria-label="Pendant ce temps"><button type="button" data-tc="cr-c" class="' + (on === 'c' ? 'on' : '') + '" aria-pressed="' + (on === 'c') + '">Créer <b data-crm="c">' + m('c') + '′</b></button><button type="button" data-tc="cr-r" class="' + (on === 'r' ? 'on' : '') + '" aria-pressed="' + (on === 'r') + '">Régler <b data-crm="r">' + m('r') + '′</b></button></span></div>'; }
-function crPaint(){ let ch = false; document.querySelectorAll('#timer [data-crm]').forEach(b => { const v = Math.floor(((T.crt || {})[b.dataset.crm] || 0) / 60000) + '′'; if (b.textContent !== v){ b.textContent = v; ch = true; } }); if (ch) persistTimer(); } /* chaque minute affichée est aussi gardée */
-function crSave(id){ if (!T || !T.cru || !T.crt || !id) return; const c = Math.round((T.crt.c || 0) / 60000), r = Math.round((T.crt.r || 0) / 60000); if (c + r <= 0) return;
-  const e = entry(id), o = isObj(e.cr) ? e.cr : {}; e.cr = { c:(+o.c || 0) + c, r:(+o.r || 0) + r }; T.crt = {}; }
-const crTxt = e => isObj(e && e.cr) && (+e.cr.c || +e.cr.r) ? 'Créé ' + fmtDur(+e.cr.c || 0) + ' · Réglé ' + fmtDur(+e.cr.r || 0) : '';
+function persistTimer(){ if (!T) { try{ localStorage.removeItem(LS_T); }catch{} return; } writeLS(LS_T, { fp:T.fp || null, started:!!T.started, id:T.id, key:T.key, jp:!!T.jp, startedAt:T.startedAt, rit:T.rit || null, add:T.add || null, idx:T.idx, remaining: remainingMs(), active:T.active, finished:T.finished, }); }
+/* étape 140 : « J'ai créé / J'ai tweaké » dans le journal (Résultat) : journal[id].crk = 'c' | 'r' | 'cr' ; le temps de la session va dans l'un, l'autre, ou moitié-moitié.
+ Ancienne donnée (étapes 135-137) : progress[id].cr = {c, r} en minutes, encore lue. */
+function crOf(id){ const j = journal[id] || {}, e = progress[id] || {};
+  if (j.crk === 'c' || j.crk === 'r' || j.crk === 'cr'){ const m = Math.max(0, Math.round(+e.minutes || 0)), c = j.crk === 'c' ? m : j.crk === 'cr' ? Math.round(m / 2) : 0; return { c, r:m - c }; }
+  return isObj(e.cr) ? { c:+e.cr.c || 0, r:+e.cr.r || 0 } : null; }
+const crTxt = id => { const x = crOf(id); return x && (x.c || x.r) ? 'Créé ' + fmtDur(x.c) + ' · Tweaké ' + fmtDur(x.r) : ''; };
+function crPickHtml(id){ const k = (journal[id] || {}).crk || '', b = (x, l) => { const on = k.indexOf(x) >= 0; return '<button type="button" class="vd vd-cr' + (on ? ' on' : '') + '" data-crk="' + x + '" aria-pressed="' + on + '">' + l + '</button>'; };
+  return '<div class="verdict cr-pick" role="group" aria-label="Pendant cette session">' + b('c', 'J\'ai créé') + b('r', 'J\'ai tweaké') + '</div>'; }
 function remainingMs(){ return T.running ? Math.max(0, T.endsAt - Date.now()) : T.remaining; }
 
 function startTimer(id, freeKey, startIdx){
@@ -4546,7 +4681,7 @@ function loop(){
   tick = setInterval(() => {
     if (!T || !T.running) return;
     const now = Date.now(), dlt = Math.max(0, Math.min(now, T.endsAt) - T.lastTs); T.active += dlt; T.lastTs = now;
-    if (T.id){ const k = T.cm === 'r' ? 'r' : 'c'; T.crt = T.crt || {}; T.crt[k] = (T.crt[k] || 0) + dlt; crPaint(); } /* étape 135 : créer ou régler */ /* étape 99 : ordinateur en veille ou onglet endormi : le temps après la fin de l'étape n'est pas compté comme travail */
+    /* étape 99 : ordinateur en veille ou onglet endormi : le temps après la fin de l'étape n'est pas compté comme travail */
     const rem = T.endsAt - now; const st = T.steps[T.idx];
     if (!T.warned && st.min >= 10 && rem <= 60000 && rem > 0){ T.warned = true; if (stepRings(st)) play('warn'); }
     if (rem <= 0) advance(true); else updateClock();
@@ -4579,7 +4714,7 @@ function addFive(){ if (!T) return; if (T.running) T.endsAt += 300000; else T.re
 function finish(){
   if (!T) return; const s = cur();
   T.running = false; T.finished = true; clearInterval(tick); keepAwake(false); play('end');
-  if (!s.free){ markDone(s.id, true); addMinutes(s.id, Math.round(T.active / 60000)); crSave(s.id); saveProgress(); planLog('Faite au minuteur : ' + s.bloc + ' · ' + fmtDur(Math.max(1, Math.round(T.active / 60000)))); saveMeta(); }
+  if (!s.free){ markDone(s.id, true); addMinutes(s.id, Math.round(T.active / 60000)); saveProgress(); planLog('Faite au minuteur : ' + s.bloc + ' · ' + fmtDur(Math.max(1, Math.round(T.active / 60000)))); saveMeta(); }
   persistTimer(); renderTimerStep();
   if (!s.free){ if (!s.extra) renderAll(); refreshWeek(s.week); renderMeters(); renderNext(); renderSuivi(); renderSplits(); fitLabels(); syncFocus(); }
 }
@@ -4649,7 +4784,7 @@ async function stopTimer(){
         { label: 'Fermer sans enregistrer', value: 'drop' },
         { label: 'Continuer la session', value: null } ]);
       if (!v || !T) return;
-      if (v === 'keep'){ addMinutes(T.id, mins); crSave(T.id); saveProgress(); refreshWeek(BY_ID[T.id].week); renderSuivi(); }
+      if (v === 'keep'){ addMinutes(T.id, mins); saveProgress(); refreshWeek(BY_ID[T.id].week); renderSuivi(); }
     }
   }
   closeAfterStop();
@@ -4767,7 +4902,7 @@ function renderTimer(){
     '<div class="t-main"><div class="t-card t-clock-card">' + intentBandHtml(s) +
       '<div class="step-name">' + esc(st.name) + '</div><div class="step-count">' + (T.steps.length > 1 ? 'Étape ' + (T.idx + 1) + ' sur ' + T.steps.length + ' · ' : '') + st.min + ' min</div>' +
       '<div class="clock' + (T.running ? '' : ' paused') + '" id="clock">' + fmt(remainingMs()) + '</div><div class="clock-sub" id="tot-left"></div>' +
-      '<div class="timer-controls"><button class="btn t-side-btn" data-tc="plus" type="button">+5 min</button><button class="round" data-tc="toggle" type="button" aria-label="' + (T.running ? 'Pause' : 'Reprendre') + '">' + (T.running ? I.pause : I.playBig) + '</button><button class="btn t-side-btn" data-tc="next" type="button">' + (nxt ? 'Suivante' : 'Terminer') + '</button></div>' + (T.started && T.id ? crSegHtml() : '') +
+      '<div class="timer-controls"><button class="btn t-side-btn" data-tc="plus" type="button">+5 min</button><button class="round" data-tc="toggle" type="button" aria-label="' + (T.running ? 'Pause' : 'Reprendre') + '">' + (T.running ? I.pause : I.playBig) + '</button><button class="btn t-side-btn" data-tc="next" type="button">' + (nxt ? 'Suivante' : 'Terminer') + '</button></div>' +
       '<div class="next-up">' + (nxt ? 'Ensuite : ' + esc(nxt.name) + ' · ' + nxt.min + ' min' : (s.free ? 'Dernière portion' : 'Dernière étape : bilan à la fin')) + '</div>' +
       /* « Relancer [étape précédente] » : discret, à côté de « Remettre à zéro » ; pour tout type de session dès la 2e étape */
       '<div class="t-links">' + (T.idx > 0 ? (() => { const pv = T.steps[T.idx - 1]; return '<button type="button" class="text-btn t-reset" data-tc="prev" title="Relancer « ' + esc(pv.name) + ' » (' + pv.min + ' min)" aria-label="Relancer ' + esc(pv.name) + '"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5"/></svg></button>'; })() : '') +
@@ -4784,7 +4919,7 @@ function renderTimer(){
       /* échauffement : rien sous le minuteur (le but arrive à l'étape Objectif) ; seule une consigne écrite dans « Formats de session » s'affiche */
       const planPart = s.free ? freePlanHtml(['ref', 'notes'].includes(st.role) && !T.fpOpen, ['ref', 'notes'].includes(st.role)) : goal;
       const noAu = T.started && (st.role === 'obj' || st.role === 'prod'); if (noAu && AU.cur && !isLibSid(AU.cur.sid)) setTimeout(() => { if (AU.cur && !isLibSid(AU.cur.sid) && T && T.started && ['obj', 'prod'].includes((T.steps[T.idx] || {}).role)){ auStop(); if (typeof intentPlayRefresh === 'function') intentPlayRefresh(); } }, 0); /* étapes Objectif et Production : pas d'écoute des références (elle revient à l'étape Référence) */
-      const panel = noAu ? '' : s.free ? (['obj', 'prod', 'ref'].includes(st.role) ? auPanelHtml(s, 'obj') : '') : ['obj', 'prod', 'ref', 'notes'].includes(st.role) ? auPanelHtml(s, st.role === 'notes' || st.role === 'ref' ? 'notes' : 'obj') : '';
+      const panel = noAu ? '' : s.free ? (['obj', 'prod', 'ref'].includes(st.role) ? auPanelHtml(s, 'obj') : '') : ['obj', 'prod', 'ref'].includes(st.role) ? auPanelHtml(s, st.role === 'ref' ? 'notes' : 'obj') : '' /* étape 140 : l'écoute reste à l'étape Référence, plus à « Notes et évaluation » */;
       const oi = T.steps.findIndex(x => x.role === 'obj'), ritFree = s.free && oi >= 0 && T.idx < Math.max(1, oi) && !rulesOf('start').filter(r => !r.target).every(r => getRit(s)[r.id]) ? ritStartHtml(s) : ''; /* seulement avant l'Objectif (à l'Échauffement), et plus du tout une fois tout coché */ /* session libre : pas d'écran de préparation, le cadre vient ici */
       return ritFree + panel + planPart; })() + journalBlock + (st.role === 'notes' && !s.free && !journalBlock ? memoBoxHtml(s) : '') + /* mémo tout à la fin */
       (T.started && !nxt ? '<div class="t-end"><button class="btn btn-primary t-end-btn" data-tc="next" type="button">Terminer la session</button></div>' : '') + /* dernière étape : on termine aussi depuis le bas de la page */
@@ -4810,8 +4945,6 @@ function timerControl0(tc){
   else if (tc === 'next') advance(false);
   else if (tc === 'prev') jumpTo(T.idx - 1);
   else if (tc === 'plus') addFive();
-  else if (tc === 'cr-c' || tc === 'cr-r'){ if (!T) return; T.cm = tc === 'cr-r' ? 'r' : 'c'; T.cru = true; persistTimer();
-    document.querySelectorAll('#timer [data-tc^="cr-"]').forEach(b => { const on = b.dataset.tc === tc; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }); }
   else if (tc === 'journal'){ T.showJ = !T.showJ; renderTimer(); }
   else if (tc === 'reset'){ resetTimer(); }
   else if (tc === 'plan'){ T.editPlan = !T.editPlan; if (!T.editPlan) T.planShut = true; renderTimer(); }
@@ -4874,7 +5007,7 @@ document.addEventListener('keydown', ev => { const f = ev.target.closest && ev.t
 function restoreTimer(){
   const t = readLS(LS_T); if (!t || t.finished || (t.id && !BY_ID[t.id]) || (!t.id && !jamMins(t.key) && !fmts().some(f => f.id === t.key))) { /* session « Jouer » (jam:30) : reprise aussi */ try{ localStorage.removeItem(LS_T); }catch{} return; }
   const s = t.id ? BY_ID[t.id] : freeSession(t.key);
-  T = { id:t.id || null, key:t.key || null, steps:stepsFor(s), idx:Math.min(t.idx, stepsFor(s).length - 1), remaining:t.remaining, endsAt:0, running:false, active:t.active || 0, lastTs:0, warned:false, finished:false, jp:!!t.jp, started: t.started !== undefined ? !!t.started : (t.active || 0) > 0, startedAt:t.startedAt || Date.now(), rit:t.rit || null, cm:t.cm === 'r' ? 'r' : 'c', crt:isObj(t.crt) ? t.crt : null, cru:!!t.cru };
+  T = { id:t.id || null, key:t.key || null, steps:stepsFor(s), idx:Math.min(t.idx, stepsFor(s).length - 1), remaining:t.remaining, endsAt:0, running:false, active:t.active || 0, lastTs:0, warned:false, finished:false, jp:!!t.jp, started: t.started !== undefined ? !!t.started : (t.active || 0) > 0, startedAt:t.startedAt || Date.now(), rit:t.rit || null,  };
   /* minutes ajoutées avec « +5 min » pendant cette séance */
   if (t.fp && typeof t.fp === 'object') T.fp = t.fp;
   if (t.add && typeof t.add === 'object'){ T.add = t.add; Object.keys(t.add).forEach(i => { const x = T.steps[+i]; if (x && t.add[i] > 0) x.min += t.add[i]; }); }
@@ -5230,7 +5363,7 @@ async function exportWithSounds(){
     for (let i = 0; i < list.length; i++){ const f = list[i]; say('Fichier ' + (i + 1) + ' sur ' + list.length + ' · ' + capTxt(String(f.k === 'a' ? f.n : 'image'), 40));
       let blob = null, src = 'original'; const r = await auGetRec(f.id);
       if (r && r.blob){ blob = r.blob; if (r.copy) src = 'copie'; }
-      else { const as = f.k === 'a' ? f.it.asset : f.x.asset; if (as) try{ const rs = await fetch('/_blob/' + as); if (rs.ok){ if (f.k === 'a' && f.it.assetOrig) blob = new Blob([b64Bytes(await rs.text())]); else { blob = await rs.blob(); if (f.k === 'a') src = 'copie'; } } }catch(e){} }
+      else { const as = f.k === 'a' ? f.it.asset : f.x.asset; if (as) try{ const rs = await assetGet(as); if (rs.ok){ if (f.k === 'a' && f.it.assetOrig) blob = f.it.assetRaw ? await rs.blob() : new Blob([b64Bytes(await rs.text())]); else { blob = await rs.blob(); if (f.k === 'a') src = 'copie'; } } }catch(e){} }
       if (!blob || !blob.size){ man.manque.push({ id:f.id, k:f.k, n:f.n }); continue; }
       const nm = f.k === 'a' ? (src === 'copie' ? zipSafe(String(f.n).replace(/\.[^.]+$/, '')) + (blob.type === 'video/webm' ? '.webm' : '.m4a') : zipSafe(f.n)) : f.id + '.' + (IMG_EXT[blob.type] || 'png');
       const path = (f.k === 'a' ? 'sons/' + f.id + ' - ' : 'images/') + nm;
@@ -5735,7 +5868,7 @@ function init(){
       if (!v){ toast('Choisis une date'); return; }
       const mode = (box.querySelector('input[type=radio]:checked') || {}).value;
       const issue = dayIssue(v, BY_ID[ea.dataset.edApply].duree);
-      try{ if (mode === 'one') moveOne(ea.dataset.edApply, v); else resumeFrom(ea.dataset.edApply, v, box.querySelector('[data-ed-prev]').checked); if (issue) setTimeout(() => toast('Date conservée : ' + issue.replace(/\.$/, '')), 150); }
+      try{ if (mode === 'one') moveOne(ea.dataset.edApply, v); else resumeFrom(ea.dataset.edApply, v, box.querySelector('[data-ed-prev]').checked, true, true); if (issue) setTimeout(() => toast('Date conservée : ' + issue.replace(/\.$/, '')), 150); }
       catch(err){ console.error(err); toast('Erreur : ' + (err && err.message ? err.message : err)); }
       return; }
     const ex = ev.target.closest('[data-ed-reset]'); if (ex){ resetOne(ex.dataset.edReset); return; }
@@ -5755,6 +5888,7 @@ function init(){
     if (ev.target.closest('#open-rules') || ev.target.closest('#rules-edit')){ openRules(); return; }
     if (ev.target.closest('#menu-backup')){ exportBackup(); return; }
     if (ev.target.closest('#menu-backup-sons')){ exportWithSounds(); return; }
+    if (ev.target.closest('#menu-drive')){ gdMenuClick(); return; }
     if (ev.target.closest('#menu-restore')){ importBackup(); return; }
     if (ev.target.closest('#menu-versions')){ showVersions(); return; }
     if (ev.target.closest('#menu-log')){ openPlanLog(); return; }
@@ -6535,15 +6669,44 @@ document.addEventListener('click', async ev => {
     if (!aiFillApply(r)) toast('Réponse incomplète : il manque les semaines. Redemande le JSON complet à l\'IA'); }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !document.getElementById('aifillovl').hidden) closeAiFill(); });
+
+/* ----- étape 142 : démarrage d'un nouvel utilisateur : style, logiciel, morceaux, semaines, jours → structure réglée ; style libre → l'IA écrit les objectifs ----- */
+const ST_STY = [['dnb', 'D&B / Neurofunk'], ['techno', 'Techno'], ['hiphop', 'Hip-hop / beats'], ['autre', 'Autre style']];
+let ST = null;
+function startHtml(){ const c = (on, a) => '<button type="button" class="chip' + (on ? ' active' : '') + '" ' + a + ' aria-pressed="' + !!on + '">';
+  return '<div class="st-sec"><h3>Ton style</h3><div class="pj-tpls">' + ST_STY.map(([k, n]) => '<button type="button" class="pj-tpl' + (ST.tpl === k ? ' on' : '') + '" data-st-tpl="' + k + '"><b>' + esc(n) + '</b></button>').join('') + '</div>' +
+      (ST.tpl === 'autre' ? '<input type="text" id="st-style" placeholder="House, trance, lo-fi…" value="' + esc(ST.style) + '" aria-label="Ton style">' : '') + '</div>' +
+    '<div class="st-sec"><h3>Ton logiciel</h3><div class="st-daws">' + Object.keys(DAWS).map(k => c(ST.daw === k, 'data-st-daw="' + k + '"') + esc(DAWS[k].n) + '</button>').join('') + '</div></div>' +
+    '<div class="st-sec st-nums"><label class="f">Morceaux<input type="number" min="1" max="24" id="st-tracks" value="' + ST.tracks + '"></label><label class="f">Semaines par morceau<input type="number" min="1" max="20" id="st-weeks" value="' + ST.weeks + '"></label></div>' +
+    '<div class="st-sec"><h3>Tes jours de travail</h3><div class="st-days">' + [1, 2, 3, 4, 5, 6, 0].map(d => c(ST.days.includes(d), 'data-st-day="' + d + '"') + ['D', 'L', 'M', 'M', 'J', 'V', 'S'][d] + '</button>').join('') + '</div></div>'; }
+function startPaint(){ const b = document.getElementById('start-body'); if (b) b.innerHTML = startHtml(); }
+function openStart(){ const P = TEMPLATES.dnb.make(); ST = { tpl:'dnb', style:'', daw:dawId(), tracks:P.tracks, weeks:P.cycleWeeks, days:settings().days.slice() };
+  startPaint(); document.getElementById('startovl').hidden = false; document.body.style.overflow = 'hidden'; }
+function closeStart(){ document.getElementById('startovl').hidden = true; document.body.style.overflow = ''; ST = null; }
+function startCreate(){
+  if (ST.tpl === 'autre' && ST.style.trim().length < 2){ toast('Écris ton style'); const i = document.getElementById('st-style'); if (i) i.focus(); return; }
+  if (!ST.days.length){ toast('Choisis au moins un jour'); return; }
+  const k = ST.tpl, base = TEMPLATES[k === 'autre' ? 'vide' : k].make(), P = cloneJ(base), lab = k === 'autre' ? capFirst(ST.style.trim()) : ST_STY.find(x => x[0] === k)[1], unit = (P.unit || 'Morceau').toLowerCase();
+  P.tracks = clampInt(ST.tracks, 1, 24, P.tracks); P.cycleWeeks = clampInt(ST.weeks, 1, 20, P.cycleWeeks); if (DAWS[ST.daw] && DAWS[ST.daw].ext) P.fileExt = DAWS[ST.daw].ext;
+  if (k === 'autre') P.name = 'Mon projet'; P.subtitle = lab + ' · ' + P.tracks + ' ' + unit + (P.tracks > 1 ? (/(eau|au|eu)$/.test(unit) ? 'x' : 's') : '');
+  const N = normalizeProject(P), order = [1, 2, 3, 4, 5, 6, 0], ia = k === 'autre' || N.cycleWeeks > base.cycleWeeks;
+  const snap = changerProjet(true, 'Avant le démarrage'); meta.daw = ST.daw; alignStartFrom(todayISO(), ST.days.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b)), 'manual');
+  meta.project = N; closeStart(); projetChange('Planning créé', snap); if (ia) setTimeout(openAiFill, 300); }
+document.addEventListener('click', ev => { const ov = ev.target.closest && ev.target.closest('#startovl'); if (!ov || !ST) return;
+  if (ev.target.closest('[data-st-close]')){ closeStart(); return; }
+  if (ev.target.closest('#st-go')){ startCreate(); return; }
+  const t = ev.target.closest('[data-st-tpl]'); if (t){ ST.tpl = t.dataset.stTpl; const P = TEMPLATES[ST.tpl === 'autre' ? 'vide' : ST.tpl].make(); ST.tracks = P.tracks; ST.weeks = P.cycleWeeks; startPaint(); if (ST.tpl === 'autre') document.getElementById('st-style').focus(); return; }
+  const d = ev.target.closest('[data-st-daw]'); if (d){ ST.daw = d.dataset.stDaw; startPaint(); return; }
+  const y = ev.target.closest('[data-st-day]'); if (y){ const n = +y.dataset.stDay, i = ST.days.indexOf(n); if (i >= 0) ST.days.splice(i, 1); else ST.days.push(n); startPaint(); } });
+document.addEventListener('input', ev => { if (!ST || !ev.target.closest) return; const id = ev.target.id; if (id === 'st-style') ST.style = ev.target.value; else if (id === 'st-tracks') ST.tracks = +ev.target.value; else if (id === 'st-weeks') ST.weeks = +ev.target.value; });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && ST && !document.getElementById('startovl').hidden) closeStart(); });
 /* première utilisation : faire savoir que c'est possible */
 function maybeOnboard(){
   let seen = false; try{ seen = localStorage.getItem('dnb-onboard-ai') === '1'; }catch{}
   if (seen) return; try{ localStorage.setItem('dnb-onboard-ai', '1'); }catch{}
   setTimeout(async () => {
     if (!document.getElementById('todayview').hidden || (T && T.started)) { try{ localStorage.removeItem('dnb-onboard-ai'); }catch{} return; }
-    const v = await askDialog('Bienvenue', 'Ce planning découpe chaque morceau en sessions courtes, avec un minuteur et un bilan à chaque fois. Il démarre avec un exemple Drum & Bass. Pour l\'adapter à ton projet : règle d\'abord sa structure (morceaux, semaines, blocs de travail), puis laisse une IA écrire les objectifs de chaque session. Tout reste modifiable dans le menu ⋯.', [
-      { label:'Configurer mon projet', value:'proj', primary:true }, { label:'Remplir avec une IA', value:'ai' }, { label:'Explorer l\'exemple', value:false } ]);
-    if (v === 'proj') openProject(); else if (v === 'ai') openAiFill();
+    openStart(); /* étape 142 */
   }, 900);
 }
 /* ----- tonalité de chaque morceau : fondamentale + gamme, affichées partout sans envahir ----- */
@@ -6818,10 +6981,11 @@ async function auIdb(mode, fn){ const d = await auDb(); return new Promise((res,
 const auPut = (aid, rec) => auIdb('readwrite', st => st.put(rec, aid));
 const auGetRec = aid => auIdb('readonly', st => st.get(aid)).catch(() => null);
 const auDelRec = aid => auIdb('readwrite', st => st.delete(aid)).catch(() => {});
-function auAssets(){ if (!AU.assetsP) AU.assetsP = (window.claude?.use) ? Promise.resolve(window.claude.use('assets')).catch(() => null) : Promise.resolve(null); return AU.assetsP; }
+function auAssets(){ if (!window.claude) return Promise.resolve(gdAssetsOn() ? gdAssets : null); /* étape 139 : hors Claude, Drive s'il est relié */
+  if (!AU.assetsP) AU.assetsP = (window.claude?.use) ? Promise.resolve(window.claude.use('assets')).catch(() => null) : Promise.resolve(null); return AU.assetsP; }
 /* fichier de cet appareil, sinon copie synchronisée (gardée ensuite sur l'appareil) */
 async function auBlob(aid){ const r = await auGetRec(aid); if (r && r.blob){ AU.has[aid] = true; return r.blob; } const it = auItem(aid); if (!it || !it.asset){ AU.has[aid] = false; return null; }
-  const rs = await fetch('/_blob/' + it.asset); if (!rs.ok) return null; const b = it.assetOrig ? new Blob([b64Bytes(await rs.text())]) : await rs.blob(); try{ await auPut(aid, { blob:b, peaks:null, copy:!!it.assetCopy }); AU.has[aid] = true; if (!AU.copy) AU.copy = {}; AU.copy[aid] = !!it.assetCopy; }catch{} return b; }
+  const rs = await assetGet(it.asset); if (!rs.ok) return null; const b = it.assetOrig && !it.assetRaw ? new Blob([b64Bytes(await rs.text())]) : await rs.blob(); try{ await auPut(aid, { blob:b, peaks:null, copy:!!it.assetCopy }); AU.has[aid] = true; if (!AU.copy) AU.copy = {}; AU.copy[aid] = !!it.assetCopy; }catch{} return b; }
 /* ----- décodage ----- */
 /* sortie de l'écoute : un limiteur qui ne touche que les crêtes au-dessus de -1 dBFS (sert quand un fichier plus faible est remonté) */
 /* étape 132 : lecture fidèle : le son va tel quel au volume général (avant : un limiteur à −1 dB, resté de l'époque où l'A/B montait le plus faible ;
@@ -7324,7 +7488,7 @@ function moImgs(m){ return m && Array.isArray(m.img) ? m.img.filter(x => isObj(x
 function moImgBtn(m, i){ const n = moImgs(m).length, t = n ? 'Voir ' + (n > 1 ? 'les ' + n + ' images' : 'l\'image') + ' de ce repère' : 'Ajouter une image (ou colle une capture avec Ctrl / Cmd + V dans un champ du repère)';
   return '<button type="button" class="icon-btn au-mo-img' + (n ? ' has' : '') + '" data-au-mo-img="' + i + '" aria-label="' + esc(t) + '" title="' + esc(t) + '">' + I_IMG + (n ? '<b>' + n + '</b>' : '') + '</button>'; }
 async function moImgBlob(x){ const r = await auGetRec(x.id); if (r && r.blob) return r.blob; if (!x.asset) return null;
-  try{ const rs = await fetch('/_blob/' + x.asset); if (!rs.ok) return null; const b = await rs.blob(); auPut(x.id, { blob:b }).catch(() => {}); return b; }catch(e){ return null; } }
+  try{ const rs = await assetGet(x.asset); if (!rs.ok) return null; const b = await rs.blob(); auPut(x.id, { blob:b }).catch(() => {}); return b; }catch(e){ return null; } }
 async function moImgUrl(x){ if (IMG_URL.has(x.id)) return IMG_URL.get(x.id); const b = await moImgBlob(x); if (!b) return null; const u = URL.createObjectURL(b); IMG_URL.set(x.id, u); return u; }
 function moImgRefresh(){ const a = document.activeElement, keep = a && a.matches && a.matches('[data-au-mf]') ? { f:a.dataset.auMf, i:a.dataset.i, box:(a.closest('#libovl') ? '#libovl' : a.closest('#timer') ? '#timer' : a.closest('#weeks-list') ? '#weeks-list' : 'body') } : null;
   Object.keys(AU.st).forEach(auRenderAll); try{ if (document.getElementById('libovl')) libRender(); }catch(e){} if (IMGV) imgViewRender();
@@ -9004,10 +9168,13 @@ const origFits = it => +it.sz > 0 && +it.sz <= ORIG_MAX;
 function blobB64(b){ return new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => { const u = String(r.result || ''); ok(u.slice(u.indexOf(',') + 1)); }; r.onerror = () => ko(r.error); r.readAsDataURL(b); }); }
 function b64Bytes(t){ t = String(t).replace(/[^A-Za-z0-9+/=]/g, ''); const out = new Uint8Array(Math.floor(t.length * 3 / 4) - (t.endsWith('==') ? 2 : t.endsWith('=') ? 1 : 0)); let o = 0;
   for (let i = 0; i < t.length; i += 65536){ const s = atob(t.slice(i, i + 65536)); for (let k = 0; k < s.length; k++) out[o++] = s.charCodeAt(k); } return out; }
-function encNeeds(aid){ const it = auItem(aid); return !!(it && !it.memo && !it.asset && !ENC.done[aid] && it.d && (it.d <= 660 || origFits(it)) && (AU.has[aid] !== false)); } /* ≤ 11 min : au-delà, la copie dépasserait 20 Mo */
+function encNeeds(aid){ const it = auItem(aid); return !!(it && !it.memo && !it.asset && !ENC.done[aid] && it.d && (it.d <= 660 || origFits(it) || gdAssetsOn()) && (AU.has[aid] !== false)); } /* ≤ 11 min : au-delà, la copie dépasserait 20 Mo */
 function encQueue(aid){ if (!encNeeds(aid) || ENC.q.includes(aid) || (ENC.busy && ENC.busy.aid === aid)) return; ENC.q.push(aid); encRun(); }
 async function encRun(){ if (ENC.busy || !ENC.q.length) return; const aid = ENC.q.shift(); if (!encNeeds(aid)){ encRun(); return; } ENC.busy = { aid, p:0 }; encPaint(aid);
   try{ const as = await auAssets(); if (!as){ ENC.done[aid] = 'off'; return; }
+    if (as === gdAssets){ const it0 = auItem(aid), rec = await auGetRec(aid), orig = rec && rec.blob; if (!it0 || !orig){ ENC.done[aid] = 'nofile'; return; } /* étape 139 : Drive : l'original, au bit près */
+      ENC.busy.p = 0.3; encPaint(aid); const r = await as.upload(new File([orig], it0.n || 'son', { type:orig.type || 'application/octet-stream' }), { type:orig.type || 'application/octet-stream' }); const it2 = auItem(aid);
+      if (it2 && r && r.id){ it2.asset = r.id; it2.assetOrig = 1; it2.assetRaw = 1; delete it2.assetCopy; delete it2.assetKb; saveMeta(); ENC.done[aid] = 'ok'; } else ENC.done[aid] = 'fail'; return; }
     { const it0 = auItem(aid), rec = await auGetRec(aid), orig = rec && rec.blob; /* étape 132 : l'original d'abord, s'il tient */
       if (it0 && orig && orig.size <= ORIG_MAX){ ENC.busy.p = 0.3; encPaint(aid); const r = await as.upload(new Blob([await blobB64(orig)], { type:'text/plain' }), { type:'text/plain' }); const it2 = auItem(aid);
         if (it2 && r && r.id){ it2.asset = r.id; it2.assetOrig = 1; delete it2.assetCopy; delete it2.assetKb; saveMeta(); ENC.done[aid] = 'ok'; } else ENC.done[aid] = 'fail'; return; } }
@@ -9015,7 +9182,7 @@ async function encRun(){ if (ENC.busy || !ENC.q.length) return; const aid = ENC.
     const onp = p => { ENC.busy.p = p; encPaint(aid); }; let out = await encAacWc(buf, onp); if (!out) out = await encRec(buf, onp); const blob = out && out.blob; if (!blob){ ENC.done[aid] = 'noenc'; toast('Ce navigateur ne sait pas compresser l’audio : la copie pour les autres appareils n’a pas pu être faite'); return; }
     if (blob.size > 20 * 1024 * 1024){ ENC.done[aid] = 'big'; return; } const it = auItem(aid); if (!it) return; const nm = (it.n || 'morceau').replace(/\.[^.]+$/, '') + (blob.type === 'video/webm' ? '.webm' : '.mp4');
     const r = await as.upload(new File([blob], nm, { type:blob.type }), { type:blob.type }); const it2 = auItem(aid); if (it2 && r && r.id){ it2.asset = r.id; it2.assetCopy = out.codec; it2.assetKb = ENC.kbps; saveMeta(); ENC.done[aid] = 'ok'; } else ENC.done[aid] = 'fail'; }
-  catch(e){ console.error('copie compressée', e); ENC.done[aid] = 'fail'; }
+  catch(e){ if (e && (e.code === 'auth' || e.code === 'offline')) delete ENC.done[aid]; else { console.error('copie compressée', e); ENC.done[aid] = 'fail'; } }
   finally { ENC.busy = null; encPaint(aid); Object.keys(AU.st).forEach(auRenderAll); if (document.getElementById('libovl')) libRender(); encRun(); } }
 function encPaint(aid){ document.querySelectorAll('[data-enc="' + aid + '"]').forEach(n => { n.textContent = encLabel(aid); }); }
 function encLabel(aid){ const it = auItem(aid); if (!it) return ''; if (ENC.busy && ENC.busy.aid === aid) return 'Synchro ' + Math.round(ENC.busy.p * 100) + ' %'; if (ENC.q.includes(aid)) return 'Synchro en attente'; if (it.asset && it.assetOrig) return 'Synchronisé (original)'; if (it.asset) return it.assetCopy ? 'Synchronisé (' + (it.assetCopy === 'opus' ? 'Opus' : 'AAC') + ' ' + (it.assetKb || 256) + ')' : 'Synchronisé';
