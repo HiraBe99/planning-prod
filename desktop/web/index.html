@@ -2576,7 +2576,7 @@ const GD = { st: (() => { const v = readLS(GD_LS); return isObj(v) ? v : {}; })(
 /* étape 147 : app de bureau (Mac / Windows) : même page, connexion Google « application de bureau » (navigateur habituel une seule fois,
  puis renouvellement silencieux), requêtes Google passées par l'app (pas de restriction du navigateur), fichiers enregistrés par l'app */
 const DESK = !!(window.__TAURI__ && window.__TAURI__.core);
-const DESK_ID = 'DESK_CLIENT_ID', DESK_SECRET = 'DESK_CLIENT_SECRET';
+const DESK_ID = 'DESK_CLIENT_ID', DESK_SECRET = 'DESK_CLIENT_SECRET'; /* client Google « application de bureau » : pour ce type, Google ne tient pas ce code pour secret */
 const gfetch = (u, o) => DESK && window.__TAURI__.http ? window.__TAURI__.http.fetch(u, o) : fetch(u, o);
 const GD_ON = () => !window.claude && (DESK || /^https?:$/.test(location.protocol));
 const gdTok = () => !!(GD.st.tok && Date.now() < (+GD.st.exp || 0) - 60000), gdOk = () => !!(GD.st.on && gdTok());

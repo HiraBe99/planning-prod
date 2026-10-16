@@ -2573,13 +2573,18 @@ function toast(msg, act){ const t = document.getElementById('toast'); t.textCont
  Accès limité aux fichiers créés par l'outil (drive.file). Jeton Google valable 1 h ; ensuite « Reconnecter Drive » (un clic) : en attendant, tout reste sur l'appareil. */
 const GD_CLIENT = '511559938654-36jg2htngdt09v7bhfrd467or86kq04n.apps.googleusercontent.com', GD_SCOPE = 'https://www.googleapis.com/auth/drive.file', GD_LS = 'dnb-gd-v1', GD_DIR = 'Planning prod (données)';
 const GD = { st: (() => { const v = readLS(GD_LS); return isObj(v) ? v : {}; })(), tc:null, wait:null, ids:{}, cache:{}, gis:null };
-const GD_ON = () => !window.claude && /^https?:$/.test(location.protocol);
+/* étape 147 : app de bureau (Mac / Windows) : même page, connexion Google « application de bureau » (navigateur habituel une seule fois,
+ puis renouvellement silencieux), requêtes Google passées par l'app (pas de restriction du navigateur), fichiers enregistrés par l'app */
+const DESK = !!(window.__TAURI__ && window.__TAURI__.core);
+const DESK_ID = 'DESK_CLIENT_ID', DESK_SECRET = 'DESK_CLIENT_SECRET'; /* client Google « application de bureau » : pour ce type, Google ne tient pas ce code pour secret */
+const gfetch = (u, o) => DESK && window.__TAURI__.http ? window.__TAURI__.http.fetch(u, o) : fetch(u, o);
+const GD_ON = () => !window.claude && (DESK || /^https?:$/.test(location.protocol));
 const gdTok = () => !!(GD.st.tok && Date.now() < (+GD.st.exp || 0) - 60000), gdOk = () => !!(GD.st.on && gdTok());
 const gdNeed = () => !!(GD_ON() && GD.st.on && !gdOk());
 function gdSaveSt(){ writeLS(GD_LS, GD.st); }
 const GAPI = 'https://www.googleapis.com/drive/v3/files', GUP = 'https://www.googleapis.com/upload/drive/v3/files';
 async function gdF(url, o = {}){ if (!gdTok()){ renderSaveState(); throw { code:'auth' }; }
-  let r; try{ r = await fetch(url, Object.assign({}, o, { headers: Object.assign({ Authorization:'Bearer ' + GD.st.tok }, o.headers || {}) })); }catch(e){ throw { code:'offline' }; }
+  let r; try{ r = await gfetch(url, Object.assign({}, o, { headers: Object.assign({ Authorization:'Bearer ' + GD.st.tok }, o.headers || {}) })); }catch(e){ throw { code:'offline' }; }
   if (r.status === 401){ GD.st.tok = null; gdSaveSt(); renderSaveState(); gdMenu(); throw { code:'auth' }; }
   if (r.status === 404) throw { code:'not_found' };
   if (!r.ok){ const t = await r.text().catch(() => ''); throw { code: r.status === 429 || r.status >= 500 || /rateLimit/i.test(t) ? 'unavailable' : 'http_' + r.status, message:t.slice(0, 200) }; }
@@ -2624,7 +2629,7 @@ const gdAssets = {
   upload: async (blob, o) => { const type = (o && o.type) || blob.type || 'application/octet-stream', sid = await gdSons();
     const r = await gdF(GUP + '?uploadType=resumable&fields=id', { method:'POST', headers:{ 'Content-Type':'application/json; charset=UTF-8', 'X-Upload-Content-Type':type }, body: JSON.stringify({ name: blob.name || 'fichier', parents:[sid] }) });
     const loc = r.headers.get('Location'); if (!loc) throw { code:'upload' };
-    let r2; try{ r2 = await fetch(loc, { method:'PUT', headers:{ 'Content-Type':type }, body:blob }); }catch(e){ throw { code:'offline' }; }
+    let r2; try{ r2 = await gfetch(loc, { method:'PUT', headers:{ 'Content-Type':type }, body: DESK ? new Uint8Array(await blob.arrayBuffer()) : blob }); }catch(e){ throw { code:'offline' }; }
     if (!r2.ok) throw { code:'http_' + r2.status }; const j = await r2.json(); return { id:'gd:' + j.id, sizeBytes:blob.size, contentType:type }; },
   delete: async ref => { ref = String(ref || ''); if (ref.indexOf('gd:') !== 0) return { deleted:false }; try{ await gdF(GAPI + '/' + ref.slice(3), { method:'DELETE' }); return { deleted:true }; }catch(e){ if (e.code === 'not_found') return { deleted:false }; throw e; } }
 };
@@ -2639,18 +2644,19 @@ async function dbBackend(){
   return { d:gdDb, uid:GD.st.uid };
 }
 /* bibliothèque de connexion Google : chargée d'avance (le clic doit ouvrir la fenêtre Google tout de suite, sinon le navigateur la bloque) */
-function gdGis(){ if (GD.gis) return GD.gis; GD.gis = new Promise((ok, ko) => { if (window.google && window.google.accounts && window.google.accounts.oauth2) return ok();
+function gdGis(){ if (DESK) return Promise.resolve(); if (GD.gis) return GD.gis; GD.gis = new Promise((ok, ko) => { if (window.google && window.google.accounts && window.google.accounts.oauth2) return ok();
   const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; sc.onload = () => ok(); sc.onerror = () => { GD.gis = null; ko(new Error('Google indisponible')); }; document.head.appendChild(sc); }); return GD.gis; }
-function gdTc(){ if (GD.tc) return GD.tc; if (!(window.google && window.google.accounts && window.google.accounts.oauth2)) return null;
+function gdTc(){ if (GD.tc) return GD.tc; if (DESK) return (GD.tc = { requestAccessToken: o => deskAuth(o).then(r => { const w = GD.wait; GD.wait = null; if (w) w.ok(r); }, e => { const w = GD.wait; GD.wait = null; if (w) w.ko(e || {}); }) });
+  if (!(window.google && window.google.accounts && window.google.accounts.oauth2)) return null;
   const done = (r, bad) => { const w = GD.wait; GD.wait = null; if (w) (bad || !r || !r.access_token ? w.ko(r || {}) : w.ok(r)); };
   GD.tc = window.google.accounts.oauth2.initTokenClient({ client_id:GD_CLIENT, scope:GD_SCOPE, callback: r => done(r, !!(r && r.error)), error_callback: e => done(e, true) }); return GD.tc; }
 async function gdConnect(quiet){
   if (GD.wait) return; /* une demande à la fois */
   const tc = gdTc(); if (!tc){ toast('Connexion à Google impossible pour l\'instant'); gdGis().catch(() => {}); return; }
   const first = !GD.st.on || !GD.st.uid;
-  const p = new Promise((ok, ko) => { GD.wait = { ok, ko }; }); tc.requestAccessToken(Object.assign({ prompt: first ? 'consent' : '' }, GD.st.email ? { login_hint:GD.st.email } : {}));
+  const p = new Promise((ok, ko) => { GD.wait = { ok, ko }; }); tc.requestAccessToken(Object.assign({ prompt: first ? 'consent' : '' }, GD.st.email ? { login_hint:GD.st.email } : {}, DESK && quiet ? { quiet:true } : {}));
   let r; try{ r = await p; }catch(e){ if (!quiet && (!e || e.type !== 'popup_closed')) toast('Connexion à Google Drive annulée'); return; }
-  if (window.google.accounts.oauth2.hasGrantedAllScopes && !window.google.accounts.oauth2.hasGrantedAllScopes(r, GD_SCOPE)){ toast('Accès à Google Drive refusé'); return; }
+  if (!DESK && window.google.accounts.oauth2.hasGrantedAllScopes && !window.google.accounts.oauth2.hasGrantedAllScopes(r, GD_SCOPE)){ toast('Accès à Google Drive refusé'); return; }
   GD.st.tok = r.access_token; GD.st.exp = Date.now() + (+r.expires_in || 3600) * 1000;
   try{ const a = await (await gdF('https://www.googleapis.com/drive/v3/about?fields=user(permissionId,emailAddress)')).json(), u = a.user || {};
     if (u.permissionId && u.permissionId !== GD.st.uid){ GD.st.fid = null; GD.ids = {}; GD.cache = {}; }
@@ -2667,16 +2673,42 @@ async function gdConnect(quiet){
   if (!quiet) toast(first ? 'Google Drive connecté' : 'Google Drive reconnecté'); gdQueueSons(); }
 /* étape 145 : l'accès Google dure 1 h : il est renouvelé au premier clic dans l'outil après son expiration (ou dans ses 5 dernières minutes) ;
  une petite fenêtre Google s'ouvre et se ferme seule. Pas plus d'un essai toutes les 10 min (fenêtre bloquée ou fermée). */
-document.addEventListener('click', () => { try{ if (!GD_ON() || !GD.st.on || !GD.st.uid || GD.wait) return; const left = (+GD.st.exp || 0) - Date.now();
+document.addEventListener('click', () => { try{ if (DESK || !GD_ON() || !GD.st.on || !GD.st.uid || GD.wait) return; const left = (+GD.st.exp || 0) - Date.now();
   if (left > 5 * 60000 || Date.now() - (GD.auto || 0) < 600000 || !gdTc()) return; GD.auto = Date.now(); gdConnect(true); }catch(e){} }, true);
 /* sons pas encore sur Drive (importés avant la liaison, ou pendant une coupure) : envoyés en arrière-plan si la synchro automatique est active */
 function gdQueueSons(){ try{ if (!gdAssetsOn() || !encAuto()) return; const A = auMeta(); Object.keys(A.items || {}).forEach(aid => { if (encNeeds(aid) && AU.has[aid] !== false) encQueue(aid); }); }catch(e){ console.warn('sons drive', e); } }
+
+/* app de bureau : jeton Google. Avec un jeton de renouvellement (GD.st.rt), sans rien demander ; sinon le navigateur habituel s'ouvre
+ (PKCE, réponse reçue sur 127.0.0.1 par l'app) ; une connexion silencieuse (prompt '') ne l'ouvre jamais d'elle-même. */
+async function deskToken(body){ let r; try{ r = await gfetch('https://oauth2.googleapis.com/token', { method:'POST', headers:{ 'Content-Type':'application/x-www-form-urlencoded' }, body:new window.URLSearchParams(Object.assign({ client_id:DESK_ID, client_secret:DESK_SECRET }, body)).toString() }); }catch(e){ throw { code:'offline' }; }
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw { code: r.status === 400 || r.status === 401 ? 'grant' : 'unavailable', type:j.error }; return j; }
+const b64u = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function deskAuth(o){ o = o || {};
+  if (GD.st.rt){ try{ const j = await deskToken({ grant_type:'refresh_token', refresh_token:GD.st.rt }); return { access_token:j.access_token, expires_in:j.expires_in }; }
+    catch(e){ if (e.code !== 'grant') throw e; GD.st.rt = null; gdSaveSt(); } }
+  if (o.quiet) throw { type:'popup_closed' }; /* renouvellement automatique : jamais d'ouverture du navigateur sans clic sur Drive */
+  const T = window.__TAURI__, ver = b64u(crypto.getRandomValues(new Uint8Array(48))), ch = b64u(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ver)));
+  const got = new Promise(ok => { T.event.once('oauth-code', e => ok(String(e.payload || ''))); });
+  const port = await T.core.invoke('oauth_listen'), redirect = 'http://127.0.0.1:' + port;
+  const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new window.URLSearchParams(Object.assign({ client_id:DESK_ID, redirect_uri:redirect, response_type:'code', scope:GD_SCOPE, code_challenge:ch, code_challenge_method:'S256', access_type:'offline', prompt:'consent' }, GD.st.email ? { login_hint:GD.st.email } : {})).toString();
+  await T.core.invoke('plugin:opener|open_url', { url });
+  const q = new window.URLSearchParams(await Promise.race([got, new Promise(ok => setTimeout(() => ok('error=timeout'), 300000))]));
+  if (!q.get('code')) throw { type:'popup_closed' };
+  const j = await deskToken({ grant_type:'authorization_code', code:q.get('code'), code_verifier:ver, redirect_uri:redirect });
+  if (j.refresh_token){ GD.st.rt = j.refresh_token; gdSaveSt(); }
+  return { access_token:j.access_token, expires_in:j.expires_in }; }
+/* app de bureau : le jeton (1 h) est renouvelé en silence avant d'expirer ; au démarrage, reconnexion sans rien demander */
+if (DESK) setInterval(() => { try{ if (GD.st.on && GD.st.rt && !GD.wait && (+GD.st.exp || 0) - Date.now() < 5 * 60000) gdConnect(true); }catch(e){} }, 60000);
+/* app de bureau : enregistrer un fichier (sauvegardes) avec la fenêtre « Enregistrer sous » du système */
+async function deskSave(name, data){ const T = window.__TAURI__; try{ const p = await T.core.invoke('plugin:dialog|save', { options:{ defaultPath:name } }); if (!p) return false;
+  const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data instanceof Blob ? await data.arrayBuffer() : data);
+  await T.core.invoke('plugin:fs|write_file', bytes, { headers:{ path:encodeURIComponent(p), options:JSON.stringify({}) } }); toast('Enregistré ✓'); return true; }catch(e){ console.error('enregistrement', e); toast('Enregistrement impossible'); return false; } }
 async function gdMenuClick(){
   if (!GD.st.on){ gdConnect(); return; }
   if (gdNeed()){ gdConnect(); return; }
   const v = await askDialog('Google Drive', GD.st.email || '', [{ label:'Synchroniser maintenant', value:'s', primary:true }, { label:'Déconnecter', value:'d' }, { label:'Fermer', value:null }]);
   if (v === 's'){ flushSaves(); lastPull = Date.now(); saveState('sync'); await initDbInner({ refresh:true }); if (!Object.keys(pendingSaves).length && !Object.keys(RETRY).length) saveState('ok'); }
-  if (v === 'd'){ flushSaves(); try{ if (GD.st.tok && window.google) window.google.accounts.oauth2.revoke(GD.st.tok, () => {}); }catch(e){}
+  if (v === 'd'){ flushSaves(); try{ if (DESK && (GD.st.rt || GD.st.tok)) gfetch('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(GD.st.rt || GD.st.tok), { method:'POST' }).catch(() => {}); else if (GD.st.tok && window.google) window.google.accounts.oauth2.revoke(GD.st.tok, () => {}); }catch(e){}
     GD.st = { email:GD.st.email }; gdSaveSt(); GD.ids = {}; GD.cache = {}; db = null; DBP = null; saveState('local'); gdMenu(); toast('Google Drive déconnecté : tout reste sur cet appareil'); } }
 function gdMenu(){ const b = document.getElementById('menu-drive'); if (!b) return; b.hidden = !GD_ON(); if (b.hidden) return;
   b.querySelector('b').textContent = !GD.st.on ? 'Synchroniser avec Google Drive' : gdNeed() ? 'Reconnecter Google Drive' : 'Google Drive · connecté';
@@ -2893,7 +2925,8 @@ const INIT_UPS = []; function upLater(path, get){ if (DB_DONE) dbSave(path, get,
   try{ gdMenu(); if (GD_ON()){ const pre = () => gdGis().then(gdTc).catch(() => {}); if (GD.st.on) pre(); else { const mb = document.getElementById('menu-btn'); if (mb) mb.addEventListener('click', pre, { once:true }); } renderSaveState();
     const ss = document.getElementById('save-state'), go = ev => { if (gdNeed() && (ev.type === 'click' || ev.key === 'Enter' || ev.key === ' ')){ ev.preventDefault(); gdConnect(); } };
     if (ss){ ss.addEventListener('click', go); ss.addEventListener('keydown', go); }
-    if (gdOk()) setTimeout(gdQueueSons, 8000); } }catch(e){ console.warn('drive', e); }
+    if (gdOk()) setTimeout(gdQueueSons, 8000);
+    else if (DESK && GD.st.on && GD.st.rt) setTimeout(() => gdConnect(true), 300); } }catch(e){ console.warn('drive', e); }
 })();
 async function initDb(){ try{ await initDbInner(); } finally { DB_DONE = true; INIT_UPS.splice(0).forEach(([p, g]) => { try{ dbSave(p, g, true); }catch(e){ console.error('synchronisation', p, e); } }); firstRunAlign(); setTimeout(() => { try{ trashPurge(); }catch(e){} }, 20000); } } /* corbeille vidée après la première synchro */
 /* synchronisation par compte : chaque personne a son espace privé « data/users/<son id>/ » (invisible des autres, propriétaire compris).
@@ -5303,7 +5336,7 @@ function textDialog(title, help, value, readonly){
   });
 }
 /* étape 124 : enregistrer un fichier hors de Claude (téléchargement du navigateur) */
-function fileSave(name, txt, type){ try{ const u = URL.createObjectURL(new Blob([txt], { type: type || 'application/json' })), a = document.createElement('a'); a.href = u; a.download = name; a.style.display = 'none'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); return true; }catch(e){ return false; } }
+function fileSave(name, txt, type){ if (typeof DESK !== 'undefined' && DESK){ deskSave(name, txt); return true; } try{ const u = URL.createObjectURL(new Blob([txt], { type: type || 'application/json' })), a = document.createElement('a'); a.href = u; a.download = name; a.style.display = 'none'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); return true; }catch(e){ return false; } }
 /* étape 125 : historique du planning : ce qui a changé (dates, sessions ajoutées, recalages, noms, sessions faites), daté, gardé et synchronisé ; 400 lignes au plus */
 function planLog(t){ try{ const m = meta.planLog = isObj(meta.planLog) ? meta.planLog : {}, k = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   m[k] = { at:new Date().toISOString(), t:String(t).slice(0, 240) }; const ks = Object.keys(m); if (ks.length > 400) ks.sort((a, b) => String((m[a] || {}).at) < String((m[b] || {}).at) ? -1 : 1).slice(0, ks.length - 400).forEach(x => { delete m[x]; }); }catch(e){} }
