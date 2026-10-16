@@ -2644,11 +2644,12 @@ function gdGis(){ if (GD.gis) return GD.gis; GD.gis = new Promise((ok, ko) => { 
 function gdTc(){ if (GD.tc) return GD.tc; if (!(window.google && window.google.accounts && window.google.accounts.oauth2)) return null;
   const done = (r, bad) => { const w = GD.wait; GD.wait = null; if (w) (bad || !r || !r.access_token ? w.ko(r || {}) : w.ok(r)); };
   GD.tc = window.google.accounts.oauth2.initTokenClient({ client_id:GD_CLIENT, scope:GD_SCOPE, callback: r => done(r, !!(r && r.error)), error_callback: e => done(e, true) }); return GD.tc; }
-async function gdConnect(){
+async function gdConnect(quiet){
+  if (GD.wait) return; /* une demande à la fois */
   const tc = gdTc(); if (!tc){ toast('Connexion à Google impossible pour l\'instant'); gdGis().catch(() => {}); return; }
   const first = !GD.st.on || !GD.st.uid;
   const p = new Promise((ok, ko) => { GD.wait = { ok, ko }; }); tc.requestAccessToken(Object.assign({ prompt: first ? 'consent' : '' }, GD.st.email ? { login_hint:GD.st.email } : {}));
-  let r; try{ r = await p; }catch(e){ if (!e || e.type !== 'popup_closed') toast('Connexion à Google Drive annulée'); return; }
+  let r; try{ r = await p; }catch(e){ if (!quiet && (!e || e.type !== 'popup_closed')) toast('Connexion à Google Drive annulée'); return; }
   if (window.google.accounts.oauth2.hasGrantedAllScopes && !window.google.accounts.oauth2.hasGrantedAllScopes(r, GD_SCOPE)){ toast('Accès à Google Drive refusé'); return; }
   GD.st.tok = r.access_token; GD.st.exp = Date.now() + (+r.expires_in || 3600) * 1000;
   try{ const a = await (await gdF('https://www.googleapis.com/drive/v3/about?fields=user(permissionId,emailAddress)')).json(), u = a.user || {};
@@ -2663,7 +2664,11 @@ async function gdConnect(){
     const vu = new Set(); Object.keys(journal).forEach(id => { const k = jChunk(id); if (vu.has(k)) return; vu.add(k); dbSave('journal/' + id, () => journal[id] || {}, true); }); }
   Object.values(RETRY).forEach(x => { clearTimeout(x.t); x.f(); });
   if (!Object.keys(pendingSaves).length && !Object.keys(RETRY).length) saveState('ok');
-  toast(first ? 'Google Drive connecté' : 'Google Drive reconnecté'); gdQueueSons(); }
+  if (!quiet) toast(first ? 'Google Drive connecté' : 'Google Drive reconnecté'); gdQueueSons(); }
+/* étape 145 : l'accès Google dure 1 h : il est renouvelé au premier clic dans l'outil après son expiration (ou dans ses 5 dernières minutes) ;
+ une petite fenêtre Google s'ouvre et se ferme seule. Pas plus d'un essai toutes les 10 min (fenêtre bloquée ou fermée). */
+document.addEventListener('click', () => { try{ if (!GD_ON() || !GD.st.on || !GD.st.uid || GD.wait) return; const left = (+GD.st.exp || 0) - Date.now();
+  if (left > 5 * 60000 || Date.now() - (GD.auto || 0) < 600000 || !gdTc()) return; GD.auto = Date.now(); gdConnect(true); }catch(e){} }, true);
 /* sons pas encore sur Drive (importés avant la liaison, ou pendant une coupure) : envoyés en arrière-plan si la synchro automatique est active */
 function gdQueueSons(){ try{ if (!gdAssetsOn() || !encAuto()) return; const A = auMeta(); Object.keys(A.items || {}).forEach(aid => { if (encNeeds(aid) && AU.has[aid] !== false) encQueue(aid); }); }catch(e){ console.warn('sons drive', e); } }
 async function gdMenuClick(){
@@ -2985,7 +2990,10 @@ function hashN(n){ let x = (n + 1) * 2654435761 >>> 0; x ^= x >>> 15; x = Math.i
 function randomThemeFor(p){ const ids = THEMES.map(x => x.id); const pick = q => ids[hashN(q) % ids.length]; let a = pick(p); const prev = pick(p - 1); if (a === prev) a = ids[(ids.indexOf(a) + 1) % ids.length]; return a; }
 function nextChangeDate(){ const p = periodIndex(); return new Date(ANCHOR + (p + 1) * PERIOD_DAYS * 86400000); }
 function themePref(){ const t = readLS(THEME_KEY); return (t === 'random' || t === 'system' || THEMES.some(x => x.id === t)) ? t : 'system'; }
-function appliedTheme(){ const p = themePref(); if (p === 'random') return randomThemeFor(periodIndex()); if (p === 'system') return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; return p; }
+/* étape 146 : en Aléatoire, un thème choisi à la main vaut jusqu'au prochain changement (le mode Aléatoire reste) */
+const RND_PICK = 'dnb-theme-rnd-pick';
+function rndPick(){ const o = readLS(RND_PICK); return o && o.p === periodIndex() && THEMES.some(x => x.id === o.t) ? o.t : ''; }
+function appliedTheme(){ const p = themePref(); if (p === 'random') return rndPick() || randomThemeFor(periodIndex()); if (p === 'system') return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; return p; }
 /* ----- textures (étapes 67 et 67b) -----
  Matières fabriquées par la page elle-même (ni image, ni bibliothèque) : de petites images SVG (bruit, relief, poussière) calculées avec les couleurs
  du thème en cours, posées SOUS le contenu : page, cartes, grande carte colorée, fenêtres plein écran. Jamais sur les boutons, les champs ni les graphiques.
@@ -3139,7 +3147,7 @@ function themeIcon(){ document.getElementById('theme-toggle').innerHTML = I.pale
 function swatch(c){ return '<span class="sw">' + c.map(x => '<i style="background:' + x + '"></i>').join('') + '</span>'; }
 function renderThemePop(){
   const pref = themePref(), cur = appliedTheme(), curT = THEMES.find(x => x.id === cur);
-  const item = (id, label, sub, sw) => '<button type="button" class="tp-item' + (pref === id ? ' on' : '') + '" data-theme-pick="' + id + '">' + sw + '<span class="tp-txt"><b>' + label + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span>' + (pref === id ? '<span class="tp-ok">✓</span>' : '') + '</button>';
+  const rp = pref === 'random' ? cur : '', item = (id, label, sub, sw) => '<button type="button" class="tp-item' + (pref === id || rp === id ? ' on' : '') + '" data-theme-pick="' + id + '">' + sw + '<span class="tp-txt"><b>' + label + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span>' + (pref === id || rp === id ? '<span class="tp-ok">✓</span>' : '') + '</button>';
   document.getElementById('theme-pop').innerHTML = '<div class="tp-h">Thème</div>' +
     THEMES.map(x => item(x.id, x.name, x.sub || '', swatch(x.sw))).join('') +
     '<div class="tp-sep"></div>' +
@@ -5804,7 +5812,10 @@ function init(){
   /* un seul menu flottant à la fois : ouvrir « … » ou la palette ferme l'autre, ainsi que « Jouer » et le choix de format (les clics de ces deux boutons ne remontent pas jusqu'à eux) */
   const closeOthers = keep => { if (keep !== 'menu' && !mPop.hidden) closeMenu(); if (keep !== 'theme' && !tPop.hidden) closePop(); jamClose(); fmtPickClose(); };
   tBtn.onclick = ev => { ev.stopPropagation(); if (tPop.hidden){ closeOthers('theme'); renderThemePop(); tPop.hidden = false; tBtn.setAttribute('aria-expanded', 'true'); } else closePop(); };
-  tPop.addEventListener('click', ev => { ev.stopPropagation(); const tb = ev.target.closest('[data-tex-pick]'); if (tb){ texSet(+tb.dataset.texPick); renderThemePop(); return; } const b = ev.target.closest('[data-theme-pick]'); if (!b) return; writeLS(THEME_KEY, b.dataset.themePick); setPref('theme', b.dataset.themePick); applyTheme(); renderThemePop(); });
+  tPop.addEventListener('click', ev => { ev.stopPropagation(); const tb = ev.target.closest('[data-tex-pick]'); if (tb){ texSet(+tb.dataset.texPick); renderThemePop(); return; } const b = ev.target.closest('[data-theme-pick]'); if (!b) return; const k = b.dataset.themePick, was = themePref();
+    if (was === 'random' && THEMES.some(x => x.id === k)){ writeLS(RND_PICK, { p:periodIndex(), t:k }); applyTheme(); renderThemePop(); return; } /* étape 146 : Aléatoire reste actif */
+    if (k === 'random' && was === 'random'){ const c = appliedTheme(); try{ localStorage.removeItem(RND_PICK); }catch(e){} writeLS(THEME_KEY, c); setPref('theme', c); applyTheme(); renderThemePop(); return; } /* recliquer : Aléatoire s'arrête sur le thème affiché */
+    try{ localStorage.removeItem(RND_PICK); }catch(e){} writeLS(THEME_KEY, k); setPref('theme', k); applyTheme(); renderThemePop(); });
   document.addEventListener('click', ev => { if (!tPop.hidden && !ev.target.closest('#theme-pop')) closePop(); });
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !tPop.hidden) closePop(); });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (themePref() === 'system') applyTheme(); });
