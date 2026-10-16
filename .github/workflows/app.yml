@@ -1,11 +1,11 @@
 # Fabrique l'app de bureau (Mac et Windows) à partir de la page du site (index.html), sur les machines de GitHub.
-# Lancement : onglet « Actions » → « App de bureau » → « Run workflow », ou automatiquement quand index.html change.
+# Lancement : onglet « Actions » → « App de bureau » → « Run workflow », ou automatiquement quand le dossier desktop change (nouvelle version de l'app).
 name: App de bureau
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['index.html', 'desktop/**', '.github/workflows/app.yml']
+    paths: ['desktop/**']
 concurrency: { group: app-bureau, cancel-in-progress: true }
 jobs:
   fabriquer:
