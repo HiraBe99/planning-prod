@@ -1,0 +1,46 @@
+# Fabrique l'app de bureau (Mac et Windows) à partir de la page du site (index.html), sur les machines de GitHub.
+# Lancement : onglet « Actions » → « App de bureau » → « Run workflow », ou automatiquement quand index.html change.
+name: App de bureau
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['index.html', 'desktop/**', '.github/workflows/app.yml']
+concurrency: { group: app-bureau, cancel-in-progress: true }
+jobs:
+  fabriquer:
+    permissions: { contents: write }
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            args: --target universal-apple-darwin
+            targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - os: windows-latest
+            args: ''
+            targets: ''
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: La page du site dans l'app
+        shell: bash
+        run: cp index.html manifest.webmanifest icone-*.png desktop/web/
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: '${{ matrix.targets }}' }
+      - uses: swatinem/rust-cache@v2
+        with: { workspaces: 'desktop/src-tauri -> target' }
+      - run: npm install
+        working-directory: desktop
+      - uses: tauri-apps/tauri-action@v0
+        env: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        with:
+          projectPath: desktop
+          tagName: app-v__VERSION__
+          releaseName: 'Planning prod, app de bureau v__VERSION__'
+          releaseBody: "Mac : télécharger le fichier .dmg. Windows : télécharger le fichier -setup.exe."
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
