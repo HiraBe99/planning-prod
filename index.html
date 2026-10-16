@@ -2631,6 +2631,8 @@ const gdAssets = {
 /* fichier stocké : dans Claude « /_blob/<id> », sur Drive le fichier lui-même ; jamais d'exception (réponse « pas ok » à la place) */
 async function assetGet(id){ id = String(id || ''); try{ if (id.indexOf('gd:') === 0) return await gdF(GAPI + '/' + encodeURIComponent(id.slice(3)) + '?alt=media'); return await fetch('/_blob/' + id); }catch(e){ return { ok:false, status:0 }; } }
 const gdAssetsOn = () => !window.claude && GD_ON() && !!GD.st.on;
+/* étape 144 : copie synchronisée joignable d'ici : dans Claude son stockage, hors Claude seulement Drive (« gd:… ») ; une sauvegarde restaurée garde les repères de Claude, inutiles ici : le son repart alors vers Drive */
+const assetOk = it => { const a = it && it.asset ? String(it.asset) : ''; return !!a && (window.claude ? a.indexOf('gd:') !== 0 : a.indexOf('gd:') === 0); };
 async function dbBackend(){
   if (window.claude && window.claude.use){ const d = await window.claude.use('db'); if (!d) return null; const u = await window.claude.use('user'); const uid = u && u.id ? await u.id().catch(() => null) : null; return uid ? { d, uid } : null; }
   if (!GD_ON() || !gdOk() || !GD.st.uid) return null;
@@ -2720,7 +2722,7 @@ const WQ = {};
 function queueWrite(wpath, op){ const p = (WQ[wpath] || Promise.resolve()).then(op); WQ[wpath] = p.catch(() => {}); return p; }
 const RETRY = {};
 /* échec passager : nouvel essai, de plus en plus espacé (5 min au plus) */
-function dbFail(where, e, refaire, essai){ const c = e && e.code; if (c === 'offline' && refaire && db){ saveState('local'); const f = () => refaire(essai + 1); RETRY[where] = { f, t:setTimeout(f, Math.min(300000, 2000 * 2 ** essai) * (0.5 + Math.random())) }; return; } /* sans réseau : nouvel essai, sans alerte */
+function dbFail(where, e, refaire, essai){ const c = (e && e.code) || (e instanceof TypeError && /fetch|network/i.test(e.message || '') ? 'offline' : ''); /* réseau coupé en pleine lecture : comme hors connexion */ if (c === 'offline' && refaire && db){ saveState('local'); const f = () => refaire(essai + 1); RETRY[where] = { f, t:setTimeout(f, Math.min(300000, 2000 * 2 ** essai) * (0.5 + Math.random())) }; return; } /* sans réseau : nouvel essai, sans alerte */
   if (c === 'auth'){ saveState('local'); if (refaire){ const f = () => refaire(essai + 1); RETRY[where] = { f, t:setTimeout(f, 600000) }; } renderSaveState(); return; } /* étape 138 : Drive à reconnecter : l'envoi repartira à la reconnexion */
   console.error('save', where, e); saveState('local');
   if (/^(invalid_argument|revoked|not_granted|capability_disabled|capability_removed|transform_error)$/.test(c)) db = null; /* pas le droit d'écrire : tout reste sur l'appareil */
@@ -6984,7 +6986,7 @@ const auDelRec = aid => auIdb('readwrite', st => st.delete(aid)).catch(() => {})
 function auAssets(){ if (!window.claude) return Promise.resolve(gdAssetsOn() ? gdAssets : null); /* étape 139 : hors Claude, Drive s'il est relié */
   if (!AU.assetsP) AU.assetsP = (window.claude?.use) ? Promise.resolve(window.claude.use('assets')).catch(() => null) : Promise.resolve(null); return AU.assetsP; }
 /* fichier de cet appareil, sinon copie synchronisée (gardée ensuite sur l'appareil) */
-async function auBlob(aid){ const r = await auGetRec(aid); if (r && r.blob){ AU.has[aid] = true; return r.blob; } const it = auItem(aid); if (!it || !it.asset){ AU.has[aid] = false; return null; }
+async function auBlob(aid){ const r = await auGetRec(aid); if (r && r.blob){ AU.has[aid] = true; return r.blob; } const it = auItem(aid); if (!it || !assetOk(it)){ AU.has[aid] = false; return null; }
   const rs = await assetGet(it.asset); if (!rs.ok) return null; const b = it.assetOrig && !it.assetRaw ? new Blob([b64Bytes(await rs.text())]) : await rs.blob(); try{ await auPut(aid, { blob:b, peaks:null, copy:!!it.assetCopy }); AU.has[aid] = true; if (!AU.copy) AU.copy = {}; AU.copy[aid] = !!it.assetCopy; }catch{} return b; }
 /* ----- décodage ----- */
 /* sortie de l'écoute : un limiteur qui ne touche que les crêtes au-dessus de -1 dBFS (sert quand un fichier plus faible est remonté) */
@@ -7169,7 +7171,7 @@ const pcName = pc => (accPref() === 'flat' ? PC_FL : PC_SH)[pc];
 /* calcul en arrière-plan, un fichier après l'autre (≈ 1 à 2 s par morceau, sans bloquer la page) */
 const AU_SUB = { p:Promise.resolve(), busy:{} };
 function auSubNeeded(it){ return it && (it.fund === undefined || it.bpm === undefined || it.bpmFix); }
-function auSubQueue(aid){ const it = auItem(aid); if (!it || AU_SUB.busy[aid] || !auSubNeeded(it) || (AU.has[aid] === false && !it.asset)) return; AU_SUB.busy[aid] = 1; trkRefreshSoon();
+function auSubQueue(aid){ const it = auItem(aid); if (!it || AU_SUB.busy[aid] || !auSubNeeded(it) || (AU.has[aid] === false && !assetOk(it))) return; AU_SUB.busy[aid] = 1; trkRefreshSoon();
   AU_SUB.p = AU_SUB.p.then(async () => { try{ const buf = await auBuffer(aid); if (!buf){ it.fund = null; return; } await auYield();
       if (buf.duration < 10){ it.bpm = null; delete it.bpmFix; } else if (it.bpm === undefined || it.bpmFix){ const r = await dsp(buf, 'auTempoFix', it.bpmFix ? it.bpm : null); it.bpm = r.bpm; it.b0 = r.b0; if (!it.bpmFix){ it.bpmS = r.sp; it.bpmV = 2; } delete it.bpmFix; await auYield(); }
       if (it.fund === undefined) it.fund = await dsp(buf, 'auFundBuf'); saveMeta();
@@ -7777,14 +7779,14 @@ function auRenderIn(el, sid, s){
       (lib ? '' : '<button type="button" class="icon-btn au-del" data-au-del aria-label="Retirer ce fichier" title="Retirer ce fichier">' + I.close + '</button>') + '</div>' : '') +
     /* l'écoute d'abord (lecture, forme d'onde, temps) : elle reste sous les yeux même avec beaucoup de repères */
     '<div class="au-tr">' + (it ? '<button type="button" class="btn btn-primary au-play" data-au-play aria-label="' + (playing ? 'Pause' : 'Lecture') + '" title="' + (playing ? 'Pause' : 'Lecture depuis ' + auTime(auPosOf(st, st.slot))) + '">' + (playing ? I.pause : I.play) + '</button>' : '') +
-      '<div class="au-wave' + (it && AU.has[aid] !== false || (it && it.asset) ? '' : ' empty') + '" data-au-wave>' + (it && (AU.has[aid] !== false || it.asset) ? '<canvas aria-hidden="true"></canvas>' : '<span>' + (it ? 'Fichier ajouté sur un autre appareil : dépose-le ici pour l\'écouter sur celui-ci' : (st.slot === 'a' && mode === 'obj' ? 'Dépose ici ton morceau : l\'export du début de session' : AU_SLOT_DROP[st.slot]) + ', ou touche « + Ajouter »') + '</span>') + '</div>' +
+      '<div class="au-wave' + (it && AU.has[aid] !== false || assetOk(it) ? '' : ' empty') + '" data-au-wave>' + (it && (AU.has[aid] !== false || assetOk(it)) ? '<canvas aria-hidden="true"></canvas>' : '<span>' + (it ? 'Fichier ajouté sur un autre appareil : dépose-le ici pour l\'écouter sur celui-ci' : (st.slot === 'a' && mode === 'obj' ? 'Dépose ici ton morceau : l\'export du début de session' : AU_SLOT_DROP[st.slot]) + ', ou touche « + Ajouter »') + '</span>') + '</div>' +
       (it ? '<span class="au-time">' + auTime(playing ? auPos() : auPosOf(st, st.slot)) + ' / ' + auTime(dur) + '</span>' : '') + '</div>' +
     /* référence : ses moments (repère, rôle, adjectif, pourquoi), juste sous la forme d'onde (étape 63) ; le premier est le point de départ de la lecture */
     (it ? auMosHtml(it) : '') +
     (AN.open && !lib && auABReady(sid) ? '<div class="an" data-an></div>' : '') +
-    (it && (AU.has[aid] !== false || it.asset) ? fundHtml(aid, it, s && s.piste) : '');
+    (it && (AU.has[aid] !== false || assetOk(it)) ? fundHtml(aid, it, s && s.piste) : '');
   if (st.loop && it && !it.bpm) auTempo(aid);
-  if (it && it.bpm > 0 && !it.bpmU && it.bpmV !== 2 && (AU.has[aid] !== false || it.asset)) setTimeout(() => auTempo(aid), 1500); /* ancienne mesure : refaite une fois, en arrière-plan */
+  if (it && it.bpm > 0 && !it.bpmU && it.bpmV !== 2 && (AU.has[aid] !== false || assetOk(it))) setTimeout(() => auTempo(aid), 1500); /* ancienne mesure : refaite une fois, en arrière-plan */
   if (it && auSubNeeded(it)) auSubQueue(aid);
   if (it && !it.tagc) auTagQueue(aid);
   const wl = el.querySelector('.au-wave'); if (wl) wl.classList.toggle('loop', !!st.loop);
@@ -9168,7 +9170,7 @@ const origFits = it => +it.sz > 0 && +it.sz <= ORIG_MAX;
 function blobB64(b){ return new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => { const u = String(r.result || ''); ok(u.slice(u.indexOf(',') + 1)); }; r.onerror = () => ko(r.error); r.readAsDataURL(b); }); }
 function b64Bytes(t){ t = String(t).replace(/[^A-Za-z0-9+/=]/g, ''); const out = new Uint8Array(Math.floor(t.length * 3 / 4) - (t.endsWith('==') ? 2 : t.endsWith('=') ? 1 : 0)); let o = 0;
   for (let i = 0; i < t.length; i += 65536){ const s = atob(t.slice(i, i + 65536)); for (let k = 0; k < s.length; k++) out[o++] = s.charCodeAt(k); } return out; }
-function encNeeds(aid){ const it = auItem(aid); return !!(it && !it.memo && !it.asset && !ENC.done[aid] && it.d && (it.d <= 660 || origFits(it) || gdAssetsOn()) && (AU.has[aid] !== false)); } /* ≤ 11 min : au-delà, la copie dépasserait 20 Mo */
+function encNeeds(aid){ const it = auItem(aid); return !!(it && !it.memo && !assetOk(it) && !ENC.done[aid] && it.d && (it.d <= 660 || origFits(it) || gdAssetsOn()) && (AU.has[aid] !== false)); } /* ≤ 11 min : au-delà, la copie dépasserait 20 Mo */
 function encQueue(aid){ if (!encNeeds(aid) || ENC.q.includes(aid) || (ENC.busy && ENC.busy.aid === aid)) return; ENC.q.push(aid); encRun(); }
 async function encRun(){ if (ENC.busy || !ENC.q.length) return; const aid = ENC.q.shift(); if (!encNeeds(aid)){ encRun(); return; } ENC.busy = { aid, p:0 }; encPaint(aid);
   try{ const as = await auAssets(); if (!as){ ENC.done[aid] = 'off'; return; }
@@ -9185,7 +9187,7 @@ async function encRun(){ if (ENC.busy || !ENC.q.length) return; const aid = ENC.
   catch(e){ if (e && (e.code === 'auth' || e.code === 'offline')) delete ENC.done[aid]; else { console.error('copie compressée', e); ENC.done[aid] = 'fail'; } }
   finally { ENC.busy = null; encPaint(aid); Object.keys(AU.st).forEach(auRenderAll); if (document.getElementById('libovl')) libRender(); encRun(); } }
 function encPaint(aid){ document.querySelectorAll('[data-enc="' + aid + '"]').forEach(n => { n.textContent = encLabel(aid); }); }
-function encLabel(aid){ const it = auItem(aid); if (!it) return ''; if (ENC.busy && ENC.busy.aid === aid) return 'Synchro ' + Math.round(ENC.busy.p * 100) + ' %'; if (ENC.q.includes(aid)) return 'Synchro en attente'; if (it.asset && it.assetOrig) return 'Synchronisé (original)'; if (it.asset) return it.assetCopy ? 'Synchronisé (' + (it.assetCopy === 'opus' ? 'Opus' : 'AAC') + ' ' + (it.assetKb || 256) + ')' : 'Synchronisé';
+function encLabel(aid){ const it = auItem(aid); if (!it) return ''; if (ENC.busy && ENC.busy.aid === aid) return 'Synchro ' + Math.round(ENC.busy.p * 100) + ' %'; if (ENC.q.includes(aid)) return 'Synchro en attente'; if (assetOk(it) && it.assetOrig) return 'Synchronisé (original)'; if (assetOk(it)) return it.assetCopy ? 'Synchronisé (' + (it.assetCopy === 'opus' ? 'Opus' : 'AAC') + ' ' + (it.assetKb || 256) + ')' : 'Synchronisé';
   const d = ENC.done[aid]; return d === 'big' ? 'Trop long pour la synchro (20 Mo)' : d === 'noenc' ? 'Synchro impossible ici' : d === 'off' ? '' : it.d > 660 ? 'Trop long pour la synchro (20 Mo)' : ''; }
 /* toute la bibliothèque : ce qui n'est pas encore synchronisé passe dans la file */
 function encAll(){ const A = auMeta(); let n = 0; Object.keys(A.items || {}).forEach(aid => { if (encNeeds(aid) && (AU.has[aid] === true || AU.has[aid] === undefined)){ encQueue(aid); n++; } }); toast(n ? n + ' morceau' + (n > 1 ? 'x' : '') + ' à synchroniser, en arrière-plan' : 'Tout est déjà synchronisé'); if (document.getElementById('libovl')) libRender(); }
@@ -9256,7 +9258,7 @@ function anSwap(){ const c = AU.cur, o = AU.sh, now = AU.ctx.currentTime, st = a
 const AN_TG = { per:{}, busy:false, key:'', n:0, todo:0, excl:[], st:null, sec:{} }, AN_TGV = 5, AN_SEC = ['Drop', 'Break'];
 const anQ = (a, f) => { const o = a.filter(v => v != null && isFinite(v)).sort((x, y) => x - y); if (!o.length) return null; const i = (o.length - 1) * f, j = Math.floor(i); return o[j] + (o[Math.min(o.length - 1, j + 1)] - o[j]) * (i - j); };
 function anTgList(ma){ const inLib = new Set(libRows().map(r => r.aid)); /* étape 83 : seulement les morceaux de la bibliothèque (pas tes exports Avant / Après ni les mémos) */
-  const all = Object.entries(auMeta().items || {}).filter(([aid, it]) => aid !== ma && inLib.has(aid) && isObj(it) && isFinite(it.lufs) && it.d >= 30 && (AU.has[aid] !== false || it.asset) && anTgIn(aid, it)), med = anQ(all.map(([, it]) => it.lufs), 0.5);
+  const all = Object.entries(auMeta().items || {}).filter(([aid, it]) => aid !== ma && inLib.has(aid) && isObj(it) && isFinite(it.lufs) && it.d >= 30 && (AU.has[aid] !== false || assetOk(it)) && anTgIn(aid, it)), med = anQ(all.map(([, it]) => it.lufs), 0.5);
   return { keep:all.filter(([, it]) => it.lufs >= med - 6).map(([aid]) => aid), excl:all.filter(([, it]) => it.lufs < med - 6).map(([aid, it]) => ({ aid, n:capTxt(String(it.n || '').replace(/\.(wav|flac|mp3|aiff?|ogg|m4a)$/i, ''), 40), d:med - it.lufs })) }; }
 /* la cible du passage écouté : les drops de tes Réf. face à un drop, leurs breaks face à un break ; rien pour une intro ou une outro */
 const anTgTy = pl => String(pl && pl.ml || '').split(' ')[0];
@@ -9446,7 +9448,7 @@ document.addEventListener('click', ev => {
   if (ev.target.closest('[data-au-lib]')){ libOpen(sid); return; }
   const wv = ev.target.closest('[data-au-wave]');
   if (wv){ if (el._mSup) return; /* le clic qui termine le glisser d'un repère ne déplace pas la lecture */
-    const a0 = auAid(sid, st.slot), it = auItem(a0); if (!it || (AU.has[a0] === false && !it.asset)){ auPick(el, st.slot); return; } const r = wv.getBoundingClientRect(), t = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)) * it.d;
+    const a0 = auAid(sid, st.slot), it = auItem(a0); if (!it || (AU.has[a0] === false && !assetOk(it))){ auPick(el, st.slot); return; } const r = wv.getBoundingClientRect(), t = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)) * it.d;
     { const q = anAncHit(el, it, ev.clientX, ev.clientY); if (q && q.est){ anAncSet(a0, q.t, sid, true); return; } } /* fanion « D? » : l'ancre est confirmée là */
     if (st.loop) return; /* boucle active : clic et glisser sont gérés plus bas (pointeur) */
     if (AU.cur && AU.cur.sid === sid) auPlay(sid, st.slot, t); else { st.posBy[st.slot] = t; auDraw(el); const tm = el.querySelector('.au-time'); if (tm) tm.textContent = auTime(t) + ' / ' + auTime(it.d); } }
@@ -9458,7 +9460,7 @@ function auCueHit(wv, it, x, y){ const r = wv.getBoundingClientRect(), mo = moLi
   mo.forEach((m, i) => { if (m.t == null) return; const cx = r.left + m.t / it.d * r.width, dx = x - cx, flag = y - r.top <= 15 && dx >= -3 && dx <= 18, d = Math.abs(dx);
     if ((d <= 7 || flag) && d < bd){ bd = d; best = i; } }); return best; }
 document.addEventListener('pointerdown', ev => { const wv = ev.target.closest && ev.target.closest('.au [data-au-wave]'); if (!wv || ev.button > 0) return;
-  const el = wv.closest('.au'), sid = el.dataset.au, st = auState(sid), aid = auAid(sid, st.slot), it = auItem(aid); if (!it || !it.d || (AU.has[aid] === false && !it.asset)) return; /* étape 84 : repères déplaçables sur tous les fichiers */
+  const el = wv.closest('.au'), sid = el.dataset.au, st = auState(sid), aid = auAid(sid, st.slot), it = auItem(aid); if (!it || !it.d || (AU.has[aid] === false && !assetOk(it))) return; /* étape 84 : repères déplaçables sur tous les fichiers */
   const i = auCueHit(wv, it, ev.clientX, ev.clientY); if (i < 0) return;
   ev.preventDefault(); ev.stopImmediatePropagation(); el._mDrag = { i, pid:ev.pointerId, x0:ev.clientX, moved:false, sid, aid }; try{ wv.setPointerCapture(ev.pointerId); }catch{} if (!it.bpm) auTempo(aid); }, true);
 document.addEventListener('pointermove', ev => {
@@ -9478,7 +9480,7 @@ function auCueEnd(ev){ for (const el of document.querySelectorAll('.au')){ const
     saveMeta(); auRenderAll(d.sid); } }
 document.addEventListener('pointerup', auCueEnd, true); document.addEventListener('pointercancel', auCueEnd, true);
 document.addEventListener('pointerdown', ev => { const wv = ev.target.closest && ev.target.closest('.au [data-au-wave]'); if (!wv || ev.button > 0) return;
-  const el = wv.closest('.au'), sid = el.dataset.au, st = auState(sid), aid = auAid(sid, st.slot), it = auItem(aid); if (!st.loop || !it || !it.d || (AU.has[aid] === false && !it.asset)) return;
+  const el = wv.closest('.au'), sid = el.dataset.au, st = auState(sid), aid = auAid(sid, st.slot), it = auItem(aid); if (!st.loop || !it || !it.d || (AU.has[aid] === false && !assetOk(it))) return;
   { const q = anAncHit(el, it, ev.clientX, ev.clientY); if (q && q.est) return; } /* étape 78 : le fanion « D? » passe avant la boucle (le clic le confirme, la boucle ne bouge pas) */
   ev.preventDefault(); const t = auWaveT(wv, it, ev.clientX), [la, lb] = auLoopRange(st, st.slot, it.d);
   el._lDrag = { pid:ev.pointerId, off: t >= la && t <= lb ? t - la : 0, sid }; el._lHover = null; wv.classList.add('dragging'); try{ wv.setPointerCapture(ev.pointerId); }catch{}
@@ -9544,10 +9546,10 @@ function libMatch(r){ return libMatchNode(r) && libMatchQ(r); }
 const libName = it => capTxt(trackTitle(it), 70);
 /* où se trouve le fichier : synchronisé (tous tes appareils), sur cet appareil, ou seulement sur un autre */
 /* seul le cas qui demande une action s'affiche : « Sur cet appareil » répété sur chaque morceau n'apprenait rien (et s'affichait avant même la vérification) */
-const libWhere = (aid, it) => !it.asset && AU.has[aid] === false ? 'Sur un autre appareil' : '';
+const libWhere = (aid, it) => !assetOk(it) && AU.has[aid] === false ? 'Sur un autre appareil' : '';
 /* bibliothèque : un bloc par morceau (nom, durée, niveau, où il est), ses repères dessous ; filtres et recherche ne gardent que les repères qui correspondent */
 /* carte d'un morceau : en-tête (▶, nom, infos, Réf., ×) ; ouverte : le lecteur complet ; fermée : ses repères (ceux qui correspondent) */
-function libCard(g, s, canRef){ const it = g.it, here = AU.has[g.aid] !== false || it.asset, open = LIB.open === g.aid, on0 = !!(AU.cur && AU.cur.sid === 'lib:' + g.aid);
+function libCard(g, s, canRef){ const it = g.it, here = AU.has[g.aid] !== false || assetOk(it), open = LIB.open === g.aid, on0 = !!(AU.cur && AU.cur.sid === 'lib:' + g.aid);
   return '<div class="lib-track' + (on0 ? ' on' : '') + (open ? ' open' : '') + '"><div class="lib-th" data-lib-toggle="' + esc(g.aid) + '">' +
     '<button type="button" class="btn btn-primary lib-play" data-lib-play="' + esc(g.aid) + '" aria-expanded="' + open + '" aria-controls="libp-' + esc(g.aid) + '" aria-label="' + (on0 ? 'Pause' : 'Écouter (ouvre la forme d\'onde et les repères)') + '"' + (here ? '' : ' disabled title="Fichier sur un autre appareil"') + '>' + (on0 ? I.pause : I.play) + '</button>' +
     '<div class="lib-tt"><span class="lib-nm"><b data-trk-name="' + esc(g.aid) + '" title="' + esc('Fichier : ' + it.n + ' · ' + trackSrc(it)) + '">' + esc(libName(it)) + '</b>' +
