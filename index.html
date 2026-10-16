@@ -2663,9 +2663,13 @@ async function gdConnect(quiet){
     GD.st.uid = u.permissionId || GD.st.uid || 'drive'; if (u.emailAddress) GD.st.email = u.emailAddress;
   }catch(e){ console.warn('drive', e); GD.st.tok = null; gdSaveSt(); toast('Google Drive ne répond pas'); return; }
   if (first) keepSnapshot(stateBundle('Avant la synchronisation Google Drive'));
+  let mode = 'fusion'; /* étape 148 : première liaison et planning déjà sur le Drive : on le récupère (appareil neuf : sans question), ou on demande */
+  if (first){ try{ if (await gdId('meta.json')) mode = !hasSessionData() ? 'drive' : (await askDialog('Ton Google Drive a déjà un planning', '', [{ label:'Récupérer celui du Drive', value:'drive', primary:true }, { label:'Garder celui de cet appareil', value:'ici' }])) || 'drive'; }catch(e){ console.warn('drive', e); } }
   GD.st.on = 1; gdSaveSt(); gdMenu(); saveState('sync');
-  lastPull = Date.now(); await initDbInner({ refresh:true });
-  if (first && db){ /* première liaison : tout ce qui est sur l'appareil (déjà fusionné avec le Drive) y est envoyé */
+  lastPull = Date.now();
+  if (mode !== 'fusion'){ const d0 = await dbBackend(); if (d0){ db = d0.d; DBP = 'data/users/' + d0.uid + '/'; } if (mode === 'drive') await takeRemote(); else await forceThisDevice(); }
+  else await initDbInner({ refresh:true });
+  if (mode === 'fusion' && first && db){ /* première liaison : tout ce qui est sur l'appareil (déjà fusionné avec le Drive) y est envoyé */
     dbSave('progress/state', () => progress, true); dbSave('meta/suivi', () => meta, true);
     const vu = new Set(); Object.keys(journal).forEach(id => { const k = jChunk(id); if (vu.has(k)) return; vu.add(k); dbSave('journal/' + id, () => journal[id] || {}, true); }); }
   Object.values(RETRY).forEach(x => { clearTimeout(x.t); x.f(); });
@@ -2706,7 +2710,9 @@ async function deskSave(name, data){ const T = window.__TAURI__; try{ const p = 
 async function gdMenuClick(){
   if (!GD.st.on){ gdConnect(); return; }
   if (gdNeed()){ gdConnect(); return; }
-  const v = await askDialog('Google Drive', GD.st.email || '', [{ label:'Synchroniser maintenant', value:'s', primary:true }, { label:'Déconnecter', value:'d' }, { label:'Fermer', value:null }]);
+  const v = await askDialog('Google Drive', GD.st.email || '', [{ label:'Synchroniser maintenant', value:'s', primary:true }, { label:'Récupérer le Drive ici', value:'r' }, { label:'Remplacer le Drive par cet appareil', value:'f' }, { label:'Déconnecter', value:'d' }, { label:'Fermer', value:null }]);
+  if (v === 'r' && await askDialog('Récupérer le Drive ici ?', 'Le planning de cet appareil est remplacé par celui du Drive. Une copie de secours est faite avant.', [{ label:'Récupérer', value:true, primary:true }, { label:'Annuler', value:false }])) await takeRemote();
+  if (v === 'f' && await askDialog('Remplacer le Drive par cet appareil ?', 'Les autres appareils recevront le planning de celui-ci. Une copie de secours est faite avant.', [{ label:'Remplacer', value:true, primary:true }, { label:'Annuler', value:false }])) await forceThisDevice();
   if (v === 's'){ flushSaves(); lastPull = Date.now(); saveState('sync'); await initDbInner({ refresh:true }); if (!Object.keys(pendingSaves).length && !Object.keys(RETRY).length) saveState('ok'); }
   if (v === 'd'){ flushSaves(); try{ if (DESK && (GD.st.rt || GD.st.tok)) gfetch('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(GD.st.rt || GD.st.tok), { method:'POST' }).catch(() => {}); else if (GD.st.tok && window.google) window.google.accounts.oauth2.revoke(GD.st.tok, () => {}); }catch(e){}
     GD.st = { email:GD.st.email }; gdSaveSt(); GD.ids = {}; GD.cache = {}; db = null; DBP = null; saveState('local'); gdMenu(); toast('Google Drive déconnecté : tout reste sur cet appareil'); } }
@@ -2928,7 +2934,8 @@ const INIT_UPS = []; function upLater(path, get){ if (DB_DONE) dbSave(path, get,
     if (gdOk()) setTimeout(gdQueueSons, 8000);
     else if (DESK && GD.st.on && GD.st.rt) setTimeout(() => gdConnect(true), 300); } }catch(e){ console.warn('drive', e); }
 })();
-async function initDb(){ try{ await initDbInner(); } finally { DB_DONE = true; INIT_UPS.splice(0).forEach(([p, g]) => { try{ dbSave(p, g, true); }catch(e){ console.error('synchronisation', p, e); } }); firstRunAlign(); setTimeout(() => { try{ trashPurge(); }catch(e){} }, 20000); } } /* corbeille vidée après la première synchro */
+let INIT_FORCE = false;
+async function initDb(){ try{ await initDbInner(); } finally { DB_DONE = true; INIT_UPS.splice(0).forEach(([p, g]) => { try{ dbSave(p, g, true); }catch(e){ console.error('synchronisation', p, e); } }); if (INIT_FORCE){ const r0 = INIT_FORCE; INIT_FORCE = false; setTimeout(() => forceThisDevice(r0), 0); } firstRunAlign(); setTimeout(() => { try{ trashPurge(); }catch(e){} }, 20000); } } /* corbeille vidée après la première synchro */
 /* synchronisation par compte : chaque personne a son espace privé « data/users/<son id>/ » (invisible des autres, propriétaire compris).
  Ordinateur et téléphone connectés au même compte voient donc le même planning ; sans compte ou sans droit d'écriture, tout reste sur l'appareil. */
 let DBP = null;
@@ -2972,6 +2979,11 @@ async function initDbInner(opts){
       if (!prev || (d[sid]._ts || 0) >= ((prev.data() || {})._ts || 0)) remote[sid] = { id:sid, exists:true, data:() => d[sid] }; }); });
     const j = { docs: Object.values(remote) };
     const newer = (doc, path) => doc.exists && ((doc.data()._ts || 0) >= (tsMap[path] || 0) || !tsMap[path]);
+    if (p.exists && !(opts && opts.force)){ const rd = clean(p.data()), rt = (rd.__depuis || {})._t || 0, lt = (progress.__depuis || {})._t || 0;
+      const perdu = rt > lt ? Object.keys(progress).filter(k => k !== '__depuis' && isObj(progress[k]) && progress[k].done && (progress[k]._t || 0) < rt && !(isObj(rd[k]) && rd[k].done)).length : 0;
+      if (perdu >= 3){ /* étape 148 : un autre appareil a remis le planning à zéro : rien n'est effacé ici sans accord */
+        const v = await askDialog('Planning remis à zéro ailleurs', 'Un autre appareil a remis le planning à zéro. Sur cet appareil, ' + perdu + ' sessions faites seraient effacées.', [{ label:'Garder cet appareil', value:'keep', primary:true }, { label:'Accepter la remise à zéro', value:'ok' }]);
+        if (v !== 'ok'){ if (DB_DONE) setTimeout(() => forceThisDevice(rt), 0); else INIT_FORCE = rt; return; } } }
     if (p.exists){ avantFusion(); const d = clean(p.data()); delete d._ts; progress = fusionProg(progress, d, newer(p, 'progress/state')); if (JSON.stringify(progress) !== JSON.stringify(d)) upLater('progress/state', () => progress); } else if (tsMap['progress/state']) upLater('progress/state', () => progress);
     if (m.exists){ const md = clean(m.data()), old = meta; meta = fusionMeta(meta, md, newer(m, 'meta/suivi')); vuMeta(); if (JSON.stringify(cheminsMeta(meta)) !== JSON.stringify(cheminsMeta(md))) upLater('meta/suivi', () => meta); meta.comparatif = meta.comparatif || {}; meta.checklist = meta.checklist || {}; meta.overrides = meta.overrides || {}; if (!Array.isArray(meta.shifts)) meta.shifts = []; if (typeof meta.resumeIdx !== 'number') meta.resumeIdx = -1; if (!meta.settings && old.settings) meta.settings = old.settings; if (meta.prefs) applyPrefsObj(meta.prefs); }
     else if (tsMap['meta/suivi']) upLater('meta/suivi', () => meta);
@@ -3001,6 +3013,23 @@ async function initDbInner(opts){
   }catch(e){ console.error('db', e); }
 }
 
+
+/* étape 148 : cet appareil remplace la synchronisation : tout ce qui est ici est daté de maintenant (comme une restauration) ;
+ ce qui n'existe qu'ailleurs (un projet créé sur un autre appareil…) est marqué effacé maintenant. Copie de secours avant. */
+async function forceThisDevice(rt){ if (!db) return; takeSnapshot('Avant : cet appareil remplace la synchronisation');
+  let rp = [], rm = null; try{ const r = await db.doc(dp('meta/suivi')).get(); if (r.exists){ rm = clean(r.data()); rp = Object.keys(cheminsMeta(rm)); } }catch(e){ console.warn('synchronisation', e); }
+  /* venu de la remise à zéro (daté d'elle ou après) et arrivé ici tel quel par une synchro : retiré */
+  if (rt && rm){ const tb = isObj(rm.__t) ? rm.__t : {}, cb = cheminsMeta(rm), ca = cheminsMeta(meta); Object.keys(cb).forEach(p => { if ((tb[p] || 0) >= rt - 120000 && p in ca && JSON.stringify(ca[p]) === JSON.stringify(cb[p]) && !MAPS.includes(p) && !ARR_IDS.includes(p) && p !== 'planLog' && p.indexOf('planLog|') !== 0 && p.indexOf('audio|') !== 0) poser(meta, p, undefined); }); }
+  const ici = new Set(Object.keys(cheminsMeta(meta)));
+  restoreBundle(stateBundle('Cet appareil remplace la synchronisation'), true);
+  rp.forEach(p => { if (!ici.has(p) && !MAPS.includes(p) && !ARR_IDS.includes(p)) poser(meta, p, undefined); }); /* ce qui n'existe qu'ailleurs : effacé */
+  const n = Date.now(), c = cheminsMeta(meta), t = meta.__t = isObj(meta.__t) ? meta.__t : {}; Object.keys(c).concat(rp).forEach(p => { if (!MAPS.includes(p) && !ARR_IDS.includes(p)) t[p] = n; }); vuMeta(); saveLocal(); loadProject(); afterProjectChange();
+  dbSave('meta/suivi', () => meta, true); flushSaves(); toast('Cet appareil a remplacé la synchronisation'); }
+/* étape 148 : cet appareil reprend tout de la synchronisation (ce qui est ici est mis de côté dans une copie de secours) */
+async function takeRemote(){ if (!db) return false; let ok = false; try{ ok = (await db.doc(dp('meta/suivi')).get()).exists; }catch(e){} if (!ok){ toast('Rien à récupérer : la synchronisation est vide'); return false; }
+  takeSnapshot('Avant : récupérer la synchronisation'); flushSaves();
+  progress = {}; journal = {}; J_VU = {}; meta = { comparatif:{}, checklist:{} }; Object.keys(tsMap).forEach(k => { delete tsMap[k]; }); writeLS(TS_KEY, tsMap); writeLS(LS_J, journal); vuMeta();
+  lastPull = Date.now(); await initDbInner({ refresh:true, force:true }); afterProjectChange(); toast('Planning récupéré'); return true; }
 let MIG_SHARED_J = [];
 /* retour sur l'onglet (après avoir travaillé sur un autre appareil) : on récupère ce qui est plus récent ailleurs */
 let lastPull = Date.now();
@@ -5282,7 +5311,8 @@ function keepSnapshot(b){
   while (list.length > 1 && JSON.stringify(list).length > 2800000) list.pop();
   VERS.s = list; versEcrire(); pushSnapshotDb(b); return b;
 }
-async function pushSnapshotDb(b){
+function pushSnapshotDb(b){ return queueWrite('snapshots', () => pushSnapshotDb0(b)); } /* étape 148 : une copie à la fois (deux copies en même temps créaient deux fois le même fichier sur Drive) */
+async function pushSnapshotDb0(b){
   if (!db) return;
   try{
     const txt = JSON.stringify(b), CH = 80000, n = Math.ceil(txt.length / CH);
@@ -6736,7 +6766,7 @@ function startCreate(){
   P.tracks = clampInt(ST.tracks, 1, 24, P.tracks); P.cycleWeeks = clampInt(ST.weeks, 1, 20, P.cycleWeeks); if (DAWS[ST.daw] && DAWS[ST.daw].ext) P.fileExt = DAWS[ST.daw].ext;
   if (k === 'autre') P.name = 'Mon projet'; P.subtitle = lab + ' · ' + P.tracks + ' ' + unit + (P.tracks > 1 ? (/(eau|au|eu)$/.test(unit) ? 'x' : 's') : '');
   const N = normalizeProject(P), order = [1, 2, 3, 4, 5, 6, 0], ia = k === 'autre' || N.cycleWeeks > base.cycleWeeks;
-  const snap = changerProjet(true, 'Avant le démarrage'); meta.daw = ST.daw; alignStartFrom(todayISO(), ST.days.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b)), 'manual');
+  const snap = changerProjet(hasSessionData(), 'Avant le démarrage'); /* étape 148 : appareil neuf : pas de repère « tout effacer » (il effaçait le planning des autres appareils à la synchro) */ meta.daw = ST.daw; alignStartFrom(todayISO(), ST.days.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b)), 'manual');
   meta.project = N; closeStart(); projetChange('Planning créé', snap); if (ia) setTimeout(openAiFill, 300); }
 document.addEventListener('click', ev => { const ov = ev.target.closest && ev.target.closest('#startovl'); if (!ov || !ST) return;
   if (ev.target.closest('[data-st-close]')){ closeStart(); return; }
