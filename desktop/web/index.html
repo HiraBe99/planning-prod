@@ -2952,7 +2952,7 @@ const versPut = () => versIdb('readwrite', st => { st.put(VERS.a, 'a'); st.put(V
 VERS.pret = Promise.all(['a', 's'].map(k => versIdb('readonly', st => st.get(k)))).then(async ([a, b]) => { const L = k => { const l = readLS(k); return Array.isArray(l) ? l : []; },
   fus = (x, y) => x.concat(y.filter(v => !x.some(w => w.at === v.at && w.label === v.label))).sort((p, q) => new Date(q.at) - new Date(p.at));
   VERS.a = fus(VERS.a, (a || []).concat(L(LS_AUTO))); VERS.s = fus(VERS.s, (b || []).concat(L(LS_SNAP))); await versPut();
-  if ((await versIdb('readonly', st => st.get('s'))).length === VERS.s.length){ localStorage.removeItem(LS_AUTO); localStorage.removeItem(LS_SNAP); } }).catch(e => { VERS.ko = 1; console.error('versions', e); });
+  if ((await versIdb('readonly', st => st.get('s'))).length === VERS.s.length){ localStorage.removeItem(LS_AUTO); localStorage.removeItem(LS_SNAP); } }).catch(e => { VERS.ko = 1; console.warn('versions', e); });
 function versEcrire(){ clearTimeout(VERS.t); VERS.t = setTimeout(() => VERS.pret.then(() => VERS.ko ? (writeLS(LS_AUTO, VERS.a), writeLS(LS_SNAP, VERS.s)) : versPut()).catch(e => console.error('versions', e)), 300); }
 loadProject();
 function dp(path){
@@ -3489,6 +3489,7 @@ function prolong(nsId){ const ns = BY_ID[nsId], pi = prolongInfo(ns); if (!pi) r
 document.addEventListener('click', ev => { const b = ev.target.closest && ev.target.closest('[data-prolong]'); if (!b) return; ev.preventDefault(); prolong(b.dataset.prolong); });
 /* étape 126 : une session prévue renommée avec une autre famille du morceau (Arrangement → « bass ») remplaçait l'Arrangement, sans rien décaler.
  On demande : en plus (une session Bass s'insère à sa place avec ton texte, Arrangement et toute la suite reculent d'une place, comme « + 1 session ») ou à la place. */
+const famKeyOf = s => s ? nameKey(s.blocBase || s.blocAuto || s.bloc || '') : ''; /* étape 151 : la famille d'une session (Bass, Kick…) telle qu'affichée */
 function canInsertFrom(s){ return !!(s && !s.extra && !s.buffer && !s.free && !s.reserve && s.piste !== 'Tampon' && !(progress[s.id] && progress[s.id].done) && s.famEdited && s.rawBase && s.blocBase && nameKey(s.blocBase) !== nameKey(s.rawBase)); }
 const deNom = x => (/^[aeiouyhàâäéèêëîïôöûü]/i.test(String(x)) ? 'd\'' : 'de ') + x;
 async function askInsert(id){ const s = BY_ID[id]; if (!canInsertFrom(s)) return;
@@ -3707,7 +3708,7 @@ function modeOf(w){ if (!isFocusWeek(w)) return weekMode[w.week] || 'semaine'; r
 function applyFilter(){ applyFilterRaw(); alignWeekHeads(); syncTrackEnd(); }
 /* étape 119 : la date de fin du morceau affiché (ou de tout le planning), toujours visible au-dessus des semaines */
 function syncTrackEnd(){ const el = document.getElementById('fr-end'); if (!el) return; const e = trackEndISO(filter === 'Tampon' ? 'Tout' : filter);
-  const t = e ? 'Fin le ' + dayShort(e) : ''; if (el.textContent !== t) el.textContent = t; el.title = e ? (filter === 'Tout' || filter === 'Tampon' ? 'Dernière session prévue du planning' : 'Dernière session prévue de ce ' + UNIT.toLowerCase()) : ''; }
+  const t = e ? 'Fin le ' + dayShort(e) + (e.slice(0, 4) !== todayISO().slice(0, 4) ? ' ' + e.slice(0, 4) : '') : ''; /* étape 151 : l'année si ce n'est pas celle en cours */ if (el.textContent !== t) el.textContent = t; el.title = e ? (filter === 'Tout' || filter === 'Tampon' ? 'Dernière session prévue du planning' : 'Dernière session prévue de ce ' + UNIT.toLowerCase()) : ''; }
 function applyFilterRaw(){
   document.querySelectorAll('.week-card').forEach(c => { const w = D.weeks[+c.dataset.week - 1];
     c.style.display = ((filter === 'Tout' || c.dataset.piste === filter) && (showPast || !weekGone(w) || +c.dataset.week === pinWeek)) ? '' : 'none';
@@ -5947,8 +5948,8 @@ function init(){
       if (ob){ const v = ob.value.trim(); j.edit = { objectif: v, test: box.querySelector('[data-te="test"]').value.trim() }; const pl = getPlan(id); if (pl.titre.trim() || v){ pl.titre = v; j.plan = pl; } }
       else { j.edit = Object.assign({}, j.edit || {}); delete j.edit.bloc; const pl = getPlan(id); pl.titre = box.querySelector('[data-te="but"]').value.replace(/\s+/g, ' ').trim(); [0, 1, 2, 3].forEach(i => { const ta = box.querySelector('[data-te="c' + i + '"]'); if (!ta && box.querySelector('.te-crits')){ pl.criteres[i] = ''; if (pl.critOk) pl.critOk[i] = false; } if (ta) pl.criteres[i] = ta.value.replace(/\s+/g, ' ').trim(); }); j.plan = pl; dropPlanUndo(id); }
       if (keepName(BY_ID[id], bv)) j.edit.bloc = bv; else if (!bn && BY_ID[id].bloc !== BY_ID[id].blocOrig) j.edit.bloc = BY_ID[id].bloc;
-      let ren = false; { const b0 = BY_ID[id].bloc; saveJournal(id); applyEdits(); const b1 = BY_ID[id].bloc; if (b1 !== b0){ ren = true; planLog('Renommée : ' + b0 + ' → ' + b1); saveMeta(); } }
-      refreshWeek(BY_ID[id].week); syncNames(); renderNext(); renderSplits(); fitLabels(); if (ren) askInsert(id); return; }
+      let ren = false, fam = false; { const b0 = BY_ID[id].bloc, f0 = famKeyOf(BY_ID[id]); saveJournal(id); applyEdits(); const b1 = BY_ID[id].bloc; fam = famKeyOf(BY_ID[id]) !== f0; if (b1 !== b0){ ren = true; planLog('Renommée : ' + b0 + ' → ' + b1); saveMeta(); } }
+      refreshWeek(BY_ID[id].week); syncNames(); renderNext(); renderSplits(); fitLabels(); if (ren && fam) askInsert(id); return; } /* étape 151 : « En plus / À la place » seulement si la famille change (pas pour « Bass » → « Sub ») */
     const tc2 = ev.target.closest('[data-te-cancel]'); if (tc2){ const row = tc2.closest('.session-row'); rowPanels(row, ''); syncPanelBtns(row); return; }
     const tr = ev.target.closest('[data-te-reset]'); if (tr){ const snapT = takeSnapshot('Avant retour au texte d\'origine (session)'); const id = tr.dataset.teReset; const j = jEntry(id); delete j.edit; saveJournal(id); applyEdits(); refreshWeek(BY_ID[id].week); syncNames(); renderNext(); renderSplits(); fitLabels(); undoToast('Texte d\'origine rétabli', snapT); return; }
     const eb = ev.target.closest('[data-edit]'); if (eb){ const row = eb.closest('.session-row'), w = row.querySelector('.ewrap'); const open = w.hidden; rowPanels(row, open ? 'ewrap' : '');
@@ -6259,7 +6260,7 @@ function blocEdit(el, off){
     if (!save || v === cur){ el.textContent = old; return; }
     const j = jEntry(id), ed = Object.assign({}, j.edit || {});
     if (keepName(s, v)) ed.bloc = v; else delete ed.bloc;
-    j.edit = ed; saveJournal(id); applyEdits(); const ren = s.bloc !== cur; if (ren){ planLog('Renommée : ' + cur + ' → ' + s.bloc); saveMeta(); } ieRedraw(() => { refreshWeek(s.week); syncNames(); renderNext(); renderSplits(); fitLabels(); if (T && T.id === id && !document.getElementById('timer').hidden) renderTimer(); if (ren) askInsert(id); }); };
+    const f0 = famKeyOf(s); j.edit = ed; saveJournal(id); applyEdits(); const ren = s.bloc !== cur, fam = famKeyOf(s) !== f0; if (ren){ planLog('Renommée : ' + cur + ' → ' + s.bloc); saveMeta(); } ieRedraw(() => { refreshWeek(s.week); syncNames(); renderNext(); renderSplits(); fitLabels(); if (T && T.id === id && !document.getElementById('timer').hidden) renderTimer(); if (ren && fam) askInsert(id); }); };
   el.addEventListener('input', onInput);
   el.addEventListener('keydown', ev => { if (ev.key === 'Enter'){ ev.preventDefault(); ev.stopPropagation(); finish(true); } else if (ev.key === 'Escape'){ ev.preventDefault(); ev.stopPropagation(); finish(false); } });
   el.addEventListener('blur', () => finish(true), { once:true });
@@ -6775,7 +6776,7 @@ function startHtml(){ const c = (on, a) => '<button type="button" class="chip' +
     '<div class="st-sec"><h3>Tes jours de travail</h3><div class="st-days">' + [1, 2, 3, 4, 5, 6, 0].map(d => c(ST.days.includes(d), 'data-st-day="' + d + '"') + ['D', 'L', 'M', 'M', 'J', 'V', 'S'][d] + '</button>').join('') + '</div></div>'; }
 function startPaint(){ const b = document.getElementById('start-body'); if (b) b.innerHTML = startHtml(); }
 function openStart(){ const P = TEMPLATES.dnb.make(); ST = { tpl:'dnb', style:'', daw:dawId(), tracks:P.tracks, weeks:P.cycleWeeks, days:settings().days.slice() };
-  startPaint(); document.getElementById('startovl').hidden = false; document.body.style.overflow = 'hidden'; }
+  startPaint(); const ov = document.getElementById('startovl'); ov.hidden = false; document.body.style.overflow = 'hidden'; setTimeout(() => { const f = ov.querySelector('.pj-tpl.on, .pj-tpl'); if (f) try{ f.focus({ preventScroll:true }); }catch(e){} }, 50); } /* étape 151 : le clavier commence dans la fenêtre */
 function closeStart(){ document.getElementById('startovl').hidden = true; document.body.style.overflow = ''; ST = null; }
 function startCreate(){
   if (ST.tpl === 'autre' && ST.style.trim().length < 2){ toast('Écris ton style'); const i = document.getElementById('st-style'); if (i) i.focus(); return; }
@@ -6794,6 +6795,11 @@ document.addEventListener('click', ev => { const ov = ev.target.closest && ev.ta
   const y = ev.target.closest('[data-st-day]'); if (y){ const n = +y.dataset.stDay, i = ST.days.indexOf(n); if (i >= 0) ST.days.splice(i, 1); else ST.days.push(n); startPaint(); } });
 document.addEventListener('input', ev => { if (!ST || !ev.target.closest) return; const id = ev.target.id; if (id === 'st-style') ST.style = ev.target.value; else if (id === 'st-tracks') ST.tracks = +ev.target.value; else if (id === 'st-weeks') ST.weeks = +ev.target.value; });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && ST && !document.getElementById('startovl').hidden) closeStart(); });
+/* étape 151 : Tab reste dans la fenêtre Bienvenue (sinon le focus partait dans la page cachée derrière) */
+document.addEventListener('keydown', ev => { if (ev.key !== 'Tab' || !ST) return; const ov = document.getElementById('startovl'); if (ov.hidden) return;
+  const f = [...ov.querySelectorAll('button, input, [tabindex="0"]')].filter(x => x.offsetParent && !x.disabled); if (!f.length) return;
+  const i = f.indexOf(document.activeElement); if (i < 0){ ev.preventDefault(); f[0].focus(); return; }
+  if (ev.shiftKey && i === 0){ ev.preventDefault(); f[f.length - 1].focus(); } else if (!ev.shiftKey && i === f.length - 1){ ev.preventDefault(); f[0].focus(); } });
 /* première utilisation : faire savoir que c'est possible */
 function maybeOnboard(){
   let seen = false; try{ seen = localStorage.getItem('dnb-onboard-ai') === '1'; }catch{}
