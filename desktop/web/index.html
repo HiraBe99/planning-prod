@@ -4681,7 +4681,7 @@ document.addEventListener('keydown', ev => { const t = ev.target.closest && ev.t
  (les aides utiles restent : « Bloqué ? Plans si-alors » en Production, « Prochaine action notée ») */
 function stepHint(s, st){ if (st.cust && st.cust.trim()) return st.cust.trim();
   /* étape 83 : à l'étape Référence, le « À comparer à la référence » du programme (Configurer le projet), en idée */
-  if (st.role === 'ref' && s && !s.free && !s.extra){ const c = String(s.compare || '').trim(); if (c && c !== '—') return 'Idée du programme, à comparer : ' + c; }
+  if (st.role === 'ref' && s && !s.free && !s.extra){ const c = String(s.compare || '').trim(); if (c && c !== '—') return 'À comparer : ' + c; }
   return ''; }
 /* dernière session réellement travaillée avant s (sessions rapides : on remonte les sessions du plan jusqu'à leur date) */
 function lastWorked(s){ if (!s || s.free) return null;
