@@ -1087,7 +1087,7 @@ input[type=range].sl.sl-sm{ height:var(--h-tag); }
 .pj-tpl:hover{ border-color:var(--accent); } .pj-tpl.on{ border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); background:var(--accent-soft); }
 .st-sec{ margin-bottom:var(--s-4); } .st-sec h3{ font-size:var(--fs-2); margin:0 0 var(--s-2); } .st-days{ display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:var(--s-1); } .st-days .chip, .st-daws .chip{ min-height:var(--h-2); border-radius:4px; font-weight:600; justify-content:center; }
 .st-daws{ display:flex; flex-wrap:wrap; gap:var(--s-1); } .st-nums{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:var(--s-3); } #st-style{ margin-top:var(--s-2); } /* étape 142 : démarrage */
-#startovl .povl-foot{ justify-content:flex-end; }
+#startovl .povl-foot{ justify-content:flex-end; } .povl-foot .btn-foot-left{ margin-right:auto; } /* étape 153 : « Restaurer une sauvegarde » à gauche dans Bienvenue */
 .pj-tpl-def{ font-size:var(--fs-1); font-weight:600; color:var(--accent-text); margin-top:auto; }
 #reserve-form{ grid-template-columns:minmax(0,1fr); } .rs-group{ margin-top:var(--s-3); min-width:0; } .rs-group > summary{ cursor:pointer; display:flex; align-items:center; flex-wrap:wrap; gap:var(--s-1) var(--s-2); min-height:var(--h-1); overflow-wrap:anywhere; min-width:0; } .rs-n{ font-size:var(--fs-1); font-weight:500; color:var(--text-dim); }
 .rs-row{ display:flex; align-items:center; justify-content:space-between; gap:var(--s-2) var(--s-3); flex-wrap:wrap; padding:var(--s-2) 0; border-top:1px solid var(--border); }
@@ -2098,7 +2098,7 @@ button.s-jour.s-jour--guess{ color:var(--text-dim); font-style:italic; }
   <div class="povl-inner" role="dialog" aria-modal="true" aria-label="Bienvenue">
     <div class="povl-head"><h2>Bienvenue</h2><button type="button" class="icon-btn" data-st-close aria-label="Fermer"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></div>
     <div class="povl-scroll" id="start-body"></div>
-    <div class="povl-foot"><button type="button" class="btn" data-st-close>Explorer l'exemple</button><button type="button" class="btn btn-primary" id="st-go">Créer mon planning</button></div>
+    <div class="povl-foot"><button type="button" class="btn btn-foot-left" id="st-restore">Restaurer une sauvegarde</button><button type="button" class="btn" data-st-close>Explorer l'exemple</button><button type="button" class="btn btn-primary" id="st-go">Créer mon planning</button></div>
   </div>
 </div>
 <div class="povl" id="searchovl" hidden>
@@ -3515,10 +3515,10 @@ function insertFrom(id){ const s = BY_ID[id]; if (!canInsertFrom(s)) return;
 /* étape 112 : en avance sur le planning : la prochaine session s'affiche au prochain jour de travail libre (assez long pour elle) ;
  affichage seul : le planning, les semaines et la date prévue ne bougent pas. Une date choisie à la main est respectée. */
 /* étape 119 : le prochain jour de travail libre (assez long pour cette session, aucune session faite ou déjà posée ce jour-là), à partir d'aujourd'hui */
-function freeDay(s, limit){
+function freeDay(s, limit, anyCap){ /* étape 153 : anyCap = n'importe quel jour de travail, quelle que soit sa durée (pour recaler : la durée suit le créneau) */
   const td = todayISO(), cap = dayCaps(), fait = new Set(); Object.keys(progress).forEach(k => { const e = progress[k]; if (e && e.done && e.doneOn) fait.add(e.doneOn); }); ALL.forEach(x => { if ((x.doneGuess && !x.doneEst) || ((x.moved || x.extra) && x.id !== s.id && !(progress[x.id] && progress[x.id].done))) fait.add(x.date); }); /* jour déjà travaillé, ou déjà pris par une session déplacée à la main */
   let d = parseISO(td);
-  for (let g = 0; g < 21; g++, d = addDays(d, 1)){ const iso = isoOf(d); if (limit && iso >= limit) return ''; if ((cap[d.getDay()] || 0) + 1e-9 >= (s.duree || 0) && !fait.has(iso)) return iso; }
+  for (let g = 0; g < 21; g++, d = addDays(d, 1)){ const iso = isoOf(d); if (limit && iso >= limit) return ''; const c = cap[d.getDay()] || 0; if ((anyCap ? c > 0 : c + 1e-9 >= (s.duree || 0)) && !fait.has(iso)) return iso; }
   return ''; }
 function aheadDay(s){
   if (!s || s.extra || s.reserve || s.free || s.moved || (meta.overrides || {})[s.id] || (progress[s.id] && progress[s.id].done)) return ''; /* étape 143 : une date posée à la main (même son jour normal) n'est jamais avancée */
@@ -3531,7 +3531,7 @@ function aheadDay(s){
 /* la session où tu en es : la première pas faite après ta dernière session faite (dans l'ordre du programme), même si elle est en retard */
 function recaleInfo(){ const lastDone = ALL.reduce((m, x) => !x.extra && !x.reserve && x.timer && progress[x.id] && progress[x.id].done ? Math.max(m, x.idx) : m, -1);
   const t = ALL.find(x => !x.extra && !x.reserve && !x.buffer && !x.free && x.timer && x.idx > lastDone && !(progress[x.id] && progress[x.id].done)); if (!t || t.id === timerSid()) return null;
-  const d = freeDay(t, ''); return d && d !== t.date ? { id: t.id, d } : null; }
+  const d = freeDay(t, '', t.date < todayISO()); return d && d !== t.date ? { id: t.id, d } : null; } /* étape 153 : en retard, on repart dès le prochain jour de travail (avant : seulement un jour assez long pour cette session → une session de week-end laissait la semaine vide) */
 function dayShort(iso){ const d = parseISO(iso); return WD[d.getDay()].slice(0, 3).toLowerCase() + '. ' + shortD(d); } /* « ven. 9 oct. » */
 function trackEndISO(p){ let e = ''; ALL.forEach(s => { if (s.reserve || s.buffer || !s.date || (p !== 'Tout' && s.piste !== p) || s.piste === 'Tampon') return; if (s.date > e) e = s.date; }); return e; }
 function endMsg(p, before){ const a = trackEndISO(p); if (!a || !before || a === before) return ''; return ' · fin du ' + UNIT.toLowerCase() + ' : ' + shortD(parseISO(before)) + ' → ' + shortD(parseISO(a)); }
@@ -3769,7 +3769,7 @@ function renderPastBar(){ /* étape 63 : sur la ligne du filtre, à droite : un 
   if (!gone.length){ el.innerHTML = ''; return; }
   const missed = gone.filter(s => s.timer && !(progress[s.id] && progress[s.id].done)).length;
   const pl = (n, w) => n + ' ' + w + (n > 1 ? 's' : '');
-  el.innerHTML = '<button class="text-btn" type="button" id="toggle-past" title="' + esc(pl(gone.length, 'session') + ' avant ton point actuel' + (missed ? ' · ' + missed + ' non cochée' + (missed > 1 ? 's' : '') : '')) + '">' + (showPast ? 'Masquer les anciennes sessions' : 'Anciennes sessions') + '</button>';
+  el.innerHTML = '<button class="text-btn" type="button" id="toggle-past" title="' + esc(pl(gone.length, 'session') + ' avant ton point actuel' + (missed ? ' · ' + missed + ' non cochée' + (missed > 1 ? 's' : '') : '')) + '">' + (showPast ? 'Masquer les anciennes sessions' : 'Anciennes sessions' + (missed ? ' · ' + missed + ' en retard' : '')) + '</button>'; /* étape 153 : le retard se voit sans ouvrir l'info-bulle (retour après une absence) */
 }
 function renderExtraForm(){
   document.getElementById('extra-form').innerHTML =
@@ -4757,7 +4757,8 @@ function loop(){
   clearInterval(tick);
   tick = setInterval(() => {
     if (!T || !T.running) return;
-    const now = Date.now(), dlt = Math.max(0, Math.min(now, T.endsAt) - T.lastTs); T.active += dlt; T.lastTs = now;
+    const now = Date.now(); if (now < T.lastTs - 2000){ T.endsAt -= T.lastTs - now; T.lastTs = now; } /* étape 153 : horloge de l'appareil remise en arrière (correction de l'heure) : l'étape garde le même temps restant, au lieu de rallonger d'autant */
+    const dlt = Math.max(0, Math.min(now, T.endsAt) - T.lastTs); T.active += dlt; T.lastTs = now;
     /* étape 99 : ordinateur en veille ou onglet endormi : le temps après la fin de l'étape n'est pas compté comme travail */
     const rem = T.endsAt - now; const st = T.steps[T.idx];
     if (!T.warned && st.min >= 10 && rem <= 60000 && rem > 0){ T.warned = true; if (stepRings(st)) play('warn'); }
@@ -4791,7 +4792,8 @@ function addFive(){ if (!T) return; if (T.running) T.endsAt += 300000; else T.re
 function finish(){
   if (!T) return; const s = cur();
   T.running = false; T.finished = true; clearInterval(tick); keepAwake(false); play('end');
-  if (!s.free){ markDone(s.id, true); addMinutes(s.id, Math.round(T.active / 60000)); saveProgress(); planLog('Faite au minuteur : ' + s.bloc + ' · ' + fmtDur(Math.max(1, Math.round(T.active / 60000)))); saveMeta(); }
+  if (!s.free){ markDone(s.id, true); { const d0 = new Date(+T.startedAt || Date.now()), i0 = isoOf(d0); if (i0 < todayISO() && new Date().getHours() < 6 && Date.now() - d0.getTime() < 12 * 3600e3) entry(s.id).doneOn = i0; } /* étape 153 : commencée le soir, finie après minuit : comptée pour la veille (soirée de travail, semaine, « Fait le ») */
+    addMinutes(s.id, Math.round(T.active / 60000)); saveProgress(); planLog('Faite au minuteur : ' + s.bloc + ' · ' + fmtDur(Math.max(1, Math.round(T.active / 60000)))); saveMeta(); }
   persistTimer(); renderTimerStep();
   if (!s.free){ if (!s.extra) renderAll(); refreshWeek(s.week); renderMeters(); renderNext(); renderSuivi(); renderSplits(); fitLabels(); syncFocus(); }
 }
@@ -5109,6 +5111,8 @@ function renderAll(){ NS_GEN++;
 let XTAB_T = 0;
 const OCCUPE = '.session-row.unfold, .jwrap:not([hidden]), .twrap:not([hidden]), .ewrap:not([hidden]), .au[data-au], #imgovl';
 window.addEventListener('storage', ev => {
+  /* étape 153 : la session terminée (ou arrêtée) dans un autre onglet disparaît aussi ici, si elle n'y tourne pas : sinon la barre « En cours » restait et pouvait la rouvrir */
+  if (ev.key === LS_T && ev.newValue === null && T && !T.running){ clearInterval(tick); T = null; closeTimer(); return; }
   if (![LS, LS_J, LS_M].includes(ev.key)) return; clearTimeout(XTAB_T);
   const go = () => { const a = document.activeElement; if (a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))){ XTAB_T = setTimeout(go, 1500); return; }
     if ((T && T.running) || document.getElementById('libovl') || document.querySelector(OCCUPE)){ XTAB_T = setTimeout(go, 1500); return; } /* bibliothèque ouverte ou session dépliée : on attend, pour ne pas refermer ce sur quoi tu travailles */
@@ -5402,9 +5406,9 @@ async function exportBackup(){
     toast('Sauvegarde enregistrée ✓');
   }catch(e){ if (!e || e.code !== 'declined') await fallback(); }
 }
-function importBackup(){ /* étape 63 : le sélecteur de fichier s'ouvre directement (plus de fenêtre d'explication ni de champ à coller) ; « Annuler » reste possible juste après */
+function importBackup(onFile){ /* étape 63 : le sélecteur de fichier s'ouvre directement (plus de fenêtre d'explication ni de champ à coller) ; « Annuler » reste possible juste après */
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,.zip,application/json,application/zip';
-  inp.onchange = async () => { const f = inp.files && inp.files[0]; if (!f) return;
+  inp.onchange = async () => { const f = inp.files && inp.files[0]; if (!f) return; if (onFile) try{ onFile(); }catch(e){} /* étape 153 : depuis Bienvenue, la fenêtre se ferme une fois le fichier choisi */
     { const h = new Uint8Array(await f.slice(0, 4).arrayBuffer()); if (h[0] === 0x50 && h[1] === 0x4B && h[2] === 3 && h[3] === 4){ importWithSounds(f); return; } } /* étape 134 : sauvegarde avec les sons */
     let b; try{ b = JSON.parse(await f.text()); }catch(e){ toast('Contenu illisible : ce n\'est pas une sauvegarde'); return; }
     restoredToast('Sauvegarde restaurée', restoreBundle(b)); };
@@ -6789,6 +6793,7 @@ function startCreate(){
   meta.project = N; closeStart(); projetChange('Planning créé', snap); if (ia) setTimeout(openAiFill, 300); }
 document.addEventListener('click', ev => { const ov = ev.target.closest && ev.target.closest('#startovl'); if (!ov || !ST) return;
   if (ev.target.closest('[data-st-close]')){ closeStart(); return; }
+  if (ev.target.closest('#st-restore')){ importBackup(closeStart); return; } /* étape 153 : changer d'appareil, ou revenir de Claude, sans passer par un planning neuf */
   if (ev.target.closest('#st-go')){ startCreate(); return; }
   const t = ev.target.closest('[data-st-tpl]'); if (t){ ST.tpl = t.dataset.stTpl; const P = TEMPLATES[ST.tpl === 'autre' ? 'vide' : ST.tpl].make(); ST.tracks = P.tracks; ST.weeks = P.cycleWeeks; startPaint(); if (ST.tpl === 'autre') document.getElementById('st-style').focus(); return; }
   const d = ev.target.closest('[data-st-daw]'); if (d){ ST.daw = d.dataset.stDaw; startPaint(); return; }
