@@ -2587,7 +2587,7 @@ async function gdF(url, o = {}){ if (!gdTok()){ renderSaveState(); throw { code:
   let r; try{ r = await gfetch(url, Object.assign({}, o, { headers: Object.assign({ Authorization:'Bearer ' + GD.st.tok }, o.headers || {}) })); }catch(e){ throw { code:'offline' }; }
   if (r.status === 401){ GD.st.tok = null; gdSaveSt(); renderSaveState(); gdMenu(); throw { code:'auth' }; }
   if (r.status === 404) throw { code:'not_found' };
-  if (!r.ok){ const t = await r.text().catch(() => ''); throw { code: r.status === 429 || r.status >= 500 || /rateLimit/i.test(t) ? 'unavailable' : 'http_' + r.status, message:t.slice(0, 200) }; }
+  if (!r.ok){ const t = await r.text().catch(() => ''); throw { code: /storageQuotaExceeded|quotaExceeded/.test(t) && !/rateLimit/i.test(t) ? 'quota_exceeded' : r.status === 429 || r.status >= 500 || /rateLimit/i.test(t) ? 'unavailable' : 'http_' + r.status, message:t.slice(0, 200) }; } /* étape 150 : Drive plein → message clair, pas de nouvel essai */
   return r; }
 const gdQ = x => String(x).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 const gdNewest = l => l.slice().sort((a, b) => String(b.modifiedTime).localeCompare(String(a.modifiedTime)));
@@ -2773,7 +2773,7 @@ function dbFail(where, e, refaire, essai){ const c = (e && e.code) || (e instanc
   console.error('save', where, e); saveState('local');
   if (/^(invalid_argument|revoked|not_granted|capability_disabled|capability_removed|transform_error)$/.test(c)) db = null; /* pas le droit d'écrire : tout reste sur l'appareil */
   else if (refaire && c !== 'quota_exceeded'){ const f = () => refaire(essai + 1); RETRY[where] = { f, t:setTimeout(f, Math.min(300000, 2000 * 2 ** essai) * (0.5 + Math.random())) }; }
-  if (e && e.code === 'quota_exceeded'){ if (!dbFail.q){ dbFail.q = true; toast('Espace de synchronisation plein : ton planning reste enregistré sur cet appareil. Une « Sauvegarde complète » (menu ⋯) le met à l\'abri.'); } return; }
+  if (e && e.code === 'quota_exceeded'){ if (!dbFail.q){ dbFail.q = true; toast(GD_ON() && GD.st.on ? 'Ton Google Drive est plein : ton planning reste enregistré sur cet appareil. Libère de la place sur Drive, ou fais une « Sauvegarde complète » (menu ⋯).' : 'Espace de synchronisation plein : ton planning reste enregistré sur cet appareil. Une « Sauvegarde complète » (menu ⋯) le met à l\'abri.'); } return; }
   if (!dbSave.warned){ dbSave.warned = true; toast('Synchronisation indisponible : ton planning est gardé sur cet appareil'); } }
 function dbSave(path, getData, now){
   if (!DB_DONE){ saveLocal(); return; }
@@ -4937,7 +4937,7 @@ function renderTimer(){
   let extra = '';
   if (s.extra && T.idx === T.steps.findIndex(x => !x.warmup)){ const p = prevAction(s); if (p) extra += '<div class="t-prev nt-line"><span><b>Prochaine action notée</b> (' + esc(p.s.bloc) + ', S' + p.s.week + ') :</span><span class="ie-j" data-inline="prochaine" data-iid="' + p.s.id + '" tabindex="0">' + esc(p.txt) + '</span></div>'; }
   if (s.free && (st.prod || (!st.warmup && T.idx <= 2))) extra += (s.test && s.test !== '—' ? '<div class="t-test"><b>Test de réussite :</b> ' + esc(s.test) + '</div>' : '');
-  if (st.prod) extra += '<details class="ifthen-box"><summary>Bloqué ? Pioche un rôle de ta bibliothèque</summary>' + blockKwHtml() + '</details>'; /* étape 63 : à la place des plans si-alors, les mots-clés (rôles) de ta bibliothèque ; un clic l'ouvre sur ce mot-clé */
+  if (st.prod && blockKwHtml().indexOf('kw-empty') < 0) extra += '<details class="ifthen-box"><summary>Bloqué ? Pioche un rôle de ta bibliothèque</summary>' + blockKwHtml() + '</details>'; /* étape 150 : rien tant que la bibliothèque n'a pas de rôles */ /* étape 63 : à la place des plans si-alors, les mots-clés (rôles) de ta bibliothèque ; un clic l'ouvre sur ce mot-clé */
   const nxt = T.steps[T.idx + 1];
   if (!s.free && T.started && !T.editPlan && !T.planShut && !(st.role === 'notes' || st.journal)){ const p0 = getPlan(s.id); if (!p0.etapes.some(e => e.trim()) && !p0.criteres.some(c => c.trim())) T.editPlan = true; } /* étapes et critères ouverts par défaut tant qu'ils sont vides */
   const planning = !s.free && (!T.started || T.editPlan || (st.role === 'obj' && !T.planShut)); /* étape 83 : à l'étape Objectif, ton but et tes critères s'ouvrent pour être relus ou réécrits ; le plan s'écrit avant le lancement ; ensuite il devient une liste à cocher (« Modifier le plan » reste possible) */
@@ -5088,6 +5088,15 @@ function restoreTimer(){
   if (t.fp && typeof t.fp === 'object') T.fp = t.fp;
   if (t.add && typeof t.add === 'object'){ T.add = t.add; Object.keys(t.add).forEach(i => { const x = T.steps[+i]; if (x && t.add[i] > 0) x.min += t.add[i]; }); }
   renderMinibar(); try{ renderNext(); }catch(e){}
+  /* étape 150 : session d'un autre jour restée ouverte (app fermée en pleine session) : on propose de la clore, plutôt que de l'afficher « En cours » */
+  if (T.started && T.id && isoOf(new Date(T.startedAt)) < todayISO()) setTimeout(async () => { if (!T || T.finished || T.running || !document.getElementById('timer').hidden) return;
+    const mins = Math.round(T.active / 60000), d = new Date(T.startedAt), s2 = BY_ID[T.id]; if (!s2) return;
+    const v = await askDialog('Session non terminée', 'La session « ' + s2.bloc + ' » du ' + dayShort(isoOf(d)) + ' est restée ouverte' + (mins > 0 ? ', avec ' + mins + ' min travaillées' : '') + '.', [
+      { label: mins > 0 ? 'Garder les minutes et fermer' : 'Fermer', value: 'keep', primary: true }, { label: 'Marquer comme faite', value: 'done' }, { label: 'La reprendre', value: null }]);
+    if (!v || !T) return;
+    if (v === 'keep' && mins > 0){ addMinutes(T.id, mins); saveProgress(); }
+    if (v === 'done'){ markDone(T.id, true); entry(T.id).doneOn = isoOf(d); if (mins > 0) addMinutes(T.id, mins); saveProgress(); planLog('Faite (session restée ouverte) : ' + s2.bloc); saveMeta(); } /* faite le jour où elle a été lancée */
+    closeAfterStop(); renderAll(); }, 700);
 }
 
 /* ----- events ----- */
@@ -5324,7 +5333,7 @@ async function pushSnapshotDb0(b){
     for (let i = 0; i < n; i++) await db.doc(dp('snapshots/c' + i)).set({ i, data: txt.slice(i * CH, (i + 1) * CH) });
     await db.doc(dp('snapshots/last')).set({ n, at: b.at, label: b.label });
     for (let i = n; i < prevN; i++) await db.doc(dp('snapshots/c' + i)).delete();
-  }catch(e){ console.error('snapshot en ligne', e); }
+  }catch(e){ if (e && (e.code === 'offline' || e.code === 'auth' || e.code === 'quota_exceeded')) console.warn('snapshot en ligne', e.code); else console.error('snapshot en ligne', e); } /* étape 150 : hors connexion : pas une erreur */
 }
 function restoreBundle(b, silent){
   if (!b || b.app !== 'planning-prod' || !b.meta || typeof b.meta !== 'object'){ toast('Fichier non reconnu'); return false; }
@@ -5892,6 +5901,7 @@ function init(){
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (themePref() === 'system') applyTheme(); });
   document.addEventListener('keydown', ev => { if (ev.key !== 'Escape' || !document.getElementById('dialog').hidden) return;
     if (!document.getElementById('rulesovl').hidden){ requestCloseRules(); return; }
+    { const ap = document.querySelector('#timer .ai-panel:not([hidden])'); if (ap){ const c = ap.querySelector('[data-aiclose]'); if (c) c.click(); else { ap.hidden = true; ap.innerHTML = ''; } return; } } /* étape 150 : Échap ferme d'abord « Proposer un plan », pas le minuteur */
     if (!document.getElementById('timer').hidden && T && !T.finished && !/^(INPUT|TEXTAREA|SELECT)$/.test((ev.target && ev.target.tagName) || '') && !document.querySelector('.povl:not([hidden]), #libovl:not([hidden])')){
       if (T.started) minimize(); else { const x = document.querySelector('#timer .timer-head [data-tc="stop"], #timer [data-tc="stop"]'); if (x) x.click(); } return; }
     if (!document.getElementById('fmtovl').hidden){ requestCloseFormats(); return; }
@@ -9632,6 +9642,7 @@ function libMatch(r){ return libMatchNode(r) && libMatchQ(r); }
 const libName = it => capTxt(trackTitle(it), 70);
 /* où se trouve le fichier : synchronisé (tous tes appareils), sur cet appareil, ou seulement sur un autre */
 /* seul le cas qui demande une action s'affiche : « Sur cet appareil » répété sur chaque morceau n'apprenait rien (et s'affichait avant même la vérification) */
+const syncAvail = () => !!(window.claude && window.claude.use) || gdAssetsOn(); /* étape 150 : une synchro des sons existe (Claude, ou Drive relié) */
 const libWhere = (aid, it) => !assetOk(it) && AU.has[aid] === false ? 'Sur un autre appareil' : '';
 /* bibliothèque : un bloc par morceau (nom, durée, niveau, où il est), ses repères dessous ; filtres et recherche ne gardent que les repères qui correspondent */
 /* carte d'un morceau : en-tête (▶, nom, infos, Réf., ×) ; ouverte : le lecteur complet ; fermée : ses repères (ceux qui correspondent) */
@@ -9655,7 +9666,7 @@ function libCard(g, s, canRef){ const it = g.it, here = AU.has[g.aid] !== false 
  sur téléphone, on descend d'un niveau et « ‹ Parcourir » remonte. Les longues listes s'affichent par 40. */
 function libRender(){ const box = document.querySelector('#libovl .lib-body'); if (!box) return;
   const rows = libRows(), mos = rows.filter(r => r.m), q = !!LIB.q.trim(), node = LIB.node || (q ? 'all' : null);
-  if (!rows.length){ box.innerHTML = '<p class="lib-empty">Pas encore de repères.</p>'; return; }
+  if (!rows.length){ box.innerHTML = '<p class="lib-empty">Ta bibliothèque est vide. Clique sur « Importer » pour y mettre tes morceaux de référence (les pros que tu vises) et tes bounces : tu pourras les écouter côte à côte, à volume égal, et y poser des repères.</p>'; return; }
   const inQ = mos.filter(libMatchQ), byRole = new Map(); let none = 0;
   inQ.forEach(r => { if (r.m.role) byRole.set(r.m.role, (byRole.get(r.m.role) || 0) + 1); else none++; });
   const roles = [...byRole].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'fr'));
@@ -9693,7 +9704,7 @@ function libRender(){ const box = document.querySelector('#libovl .lib-body'); i
   const subs = node === 'role' && oriList.some(o => o[0]) ? '<div class="lib-subs" role="group" aria-label="Adjectifs">' + oriList.map(([o, m]) => o ? tn('data-lib-ori', o, o, m, LIB.ori === o, 'lvl2') : tn('data-lib-ori', LIB_NONE, 'Sans adjectif', m, LIB.ori === LIB_NONE, 'lvl2 dim')).join('') + '</div>' : ''; /* étape 83 : « Sans adjectif » aussi sur téléphone */
   const results = '<div class="lib-res"><div class="lib-crumb">' + (node ? '<button type="button" class="text-btn lib-back" data-lib-back aria-label="Revenir à l\'arborescence">‹ Parcourir</button>' : '') + '<span>' + esc(head) + '</span></div>' + subs +
     (shown.length ? '<div class="lib-list">' + cards + '</div>' + (list.length > lim ? '<button type="button" class="chip lib-more" data-lib-more>Afficher ' + Math.min(40, list.length - lim) + ' de plus (' + (list.length - lim) + ' restants)</button>' : '')
-      : '<p class="lib-empty">' + (rows.length ? 'Rien ne correspond.' : 'Pas encore de repères.') + '</p>') + '</div>';
+      : '<p class="lib-empty">' + (rows.length ? 'Rien ne correspond.' : 'Pas encore de repères : écoute un morceau et clique sur « Poser un repère ici » au moment qui t\'intéresse.') + '</p>') + '</div>';
   clearTimeout(LIB.anaT); LIB.anaT = setTimeout(() => { if (!document.getElementById('libovl')) return; shown.forEach(g => { if (auSubNeeded(g.it)) auSubQueue(g.aid); }); }, 1500);
   box.innerHTML = '<datalist id="lib-fams">' + anFams().map(([f]) => '<option value="' + esc(f) + '">').join('') + '</datalist><div class="lib-sum">' + nTr + ' morceau' + (nTr > 1 ? 'x' : '') + ' · ' + nMo + ' repère' + (nMo > 1 ? 's' : '') + (LIB.persist ? ' · stockage protégé' : '') + (canRef ? ' · Réf. 1, 2, 3 pour ' + esc(pName(s.piste)) : '') + '</div>' +
     '<div class="lib-cols' + (node ? ' drill' : '') + '">' + tree + results + '</div>';
@@ -9711,7 +9722,7 @@ document.addEventListener('change', ev => { const i = ev.target.closest && ev.ta
 function libOpen(sid){ libClose(); LIB.sid = sid || (T && T.id) || null; LIB.q = ''; LIB.role = ''; LIB.ori = ''; LIB.node = null; LIB.limit = 40; /* chaque ouverture repart de toute la bibliothèque */
   const el = document.createElement('div'); el.id = 'libovl'; el.className = 'lib-ovl';
   el.innerHTML = '<div class="lib-box" role="dialog" aria-modal="true" aria-label="Bibliothèque de références"><div class="lib-head"><h3>Bibliothèque de références</h3>' +
-    '<button type="button" class="chip" data-lib-clear title="Retirer tous les morceaux de la bibliothèque">Vider</button><label class="chip" data-lib-import for="lib-file-in" title="Ajouter des fichiers à la bibliothèque" role="button" tabindex="0">Importer</label><button type="button" class="chip" data-lib-sync-all title="Fabrique une copie AAC 256 kb/s de chaque morceau pas encore synchronisé et l’envoie pour tes autres appareils (en arrière-plan, un morceau à la fois)">Synchroniser</button><button type="button" class="chip' + (encAuto() ? ' active' : '') + '" data-lib-auto aria-pressed="' + (encAuto() ? 'true' : 'false') + '" title="Synchro automatique à l’import (réglage de cet appareil) : ' + (encAuto() ? 'activée' : 'coupée') + '">Auto</button><button type="button" class="icon-btn" data-lib-close aria-label="Fermer">' + I.close + '</button></div>' +
+    '<button type="button" class="chip" data-lib-clear title="Retirer tous les morceaux de la bibliothèque">Vider</button><label class="chip" data-lib-import for="lib-file-in" title="Ajouter des fichiers à la bibliothèque" role="button" tabindex="0">Importer</label>' + (syncAvail() ? '<button type="button" class="chip" data-lib-sync-all title="Envoie chaque morceau pas encore synchronisé pour tes autres appareils (en arrière-plan, un morceau à la fois)">Synchroniser</button><button type="button" class="chip' + (encAuto() ? ' active' : '') + '" data-lib-auto aria-pressed="' + (encAuto() ? 'true' : 'false') + '" title="Synchro automatique à l’import (réglage de cet appareil) : ' + (encAuto() ? 'activée' : 'coupée') + '">Auto</button>' : '') + '<button type="button" class="icon-btn" data-lib-close aria-label="Fermer">' + I.close + '</button></div>' +
     '<input type="text" inputmode="search" enterkeyhint="search" autocomplete="off" class="lib-q" data-lib-q placeholder="Chercher : turnaround percussif, kick synthétique…" aria-label="Chercher un moment" value="' + esc(LIB.q) + '">' +
     '<div class="lib-body"></div><input type="file" id="lib-file-in" class="lib-file vh" accept="' + AU_ACCEPT + '" multiple aria-label="Fichiers à ajouter à la bibliothèque"></div>';
   document.body.appendChild(el); document.body.classList.add('lib-open'); libRender();
@@ -9816,7 +9827,7 @@ async function memoStart(sid){
   try{ stream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true } }); }
   catch(e){ toast('Micro indisponible ici' + (e && e.name === 'NotAllowedError' ? ' (accès refusé)' : '') + ''); memoRenderAll(sid); return; }
   const mime = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg;codecs=opus'].find(t => window.MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
-  let rec; try{ rec = new MediaRecorder(stream, Object.assign({ audioBitsPerSecond:64000 }, mime ? { mimeType:mime } : {})); }catch(e){ stream.getTracks().forEach(t => t.stop()); toast('Enregistrement impossible sur ce navigateur'); return; }
+  let rec; try{ rec = new MediaRecorder(stream, Object.assign({ audioBitsPerSecond:64000 }, mime ? { mimeType:mime } : {})); }catch(e){ stream.getTracks().forEach(t => t.stop()); toast('Enregistrement impossible dans ce navigateur'); return; }
   memoStopPlay(); if (AU.cur) { auStop(); auRenderAll(AU.cur ? AU.cur.sid : sid); }
   Object.assign(MEMO, { rec, stream, chunks:[], sid, t0:Date.now(), mime:rec.mimeType || mime });
   rec.ondataavailable = e => { if (e.data && e.data.size) MEMO.chunks.push(e.data); };
