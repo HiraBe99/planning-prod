@@ -765,8 +765,8 @@ table.t{ width:100%; border-collapse:collapse; font-size:var(--fs-3); }
 @media (max-width:520px){ .cn-open{ gap:var(--s-4); } .cn-open-h{ margin-bottom:calc(var(--s-2) * -1); } .cn-open-r{ display:grid; gap:var(--s-2); justify-items:start; } }
 .cn-open-t{ display:grid; font-size:var(--fs-2); min-width:0; overflow-wrap:anywhere; } .cn-open-t small{ color:var(--text-dim); font-size:var(--fs-1); }
 .recap{ display:grid; gap:var(--s-3); padding:var(--s-4) var(--inset); } .recap-h{ display:flex; align-items:baseline; gap:var(--s-3); } .recap-h b{ font-family:var(--font-display); font-size:var(--fs-3); } .recap-h span{ color:var(--text-dim); font-size:var(--fs-1); } .recap-h .text-btn{ margin-left:auto; margin-right:0; }
-.recap .stat-grid{ grid-template-columns:repeat(3, minmax(0, 1fr)); } @media (max-width:520px){ .recap .stat-grid{ grid-template-columns:1fr 1fr; } }
-.recap .stat-cell small{ font-size:.6em; color:var(--text-dim); font-weight:600; } .recap-j{ font-size:var(--fs-2); color:var(--text-dim); display:flex; flex-wrap:wrap; align-items:center; gap:6px; } .recap-j b{ color:var(--text); } .recap-j svg{ color:var(--accent); }
+.recap .stat-grid{ grid-template-columns:repeat(3, minmax(0, 1fr)); } @media (max-width:520px){ .recap .stat-grid{ grid-template-columns:1fr 1fr; } .recap .stat-cell:last-child:nth-child(odd){ grid-column:1 / -1; } } /* étape 154 : téléphone, 3 cases sur 2 colonnes : la dernière prend la largeur (plus de case vide) */
+.recap .stat-cell small{ font-size:.6em; color:var(--text-dim); font-weight:600; } .recap-j{ font-size:var(--fs-2); color:var(--text-dim); display:flex; flex-wrap:wrap; align-items:center; gap:6px; } .recap-j b{ color:var(--text); } .recap-j svg{ color:var(--accent); } .recap-j .rj-when::before{ content:'· '; } @media (max-width:520px){ .recap-j .rj-when{ flex-basis:100%; } .recap-j .rj-when::before{ content:''; } } /* étape 154 : téléphone, la date du jalon sur sa ligne, sans point qui traîne */
 #week-recap:not(:empty){ margin-bottom:var(--s-4); }
 .cn-ok{ font-size:var(--fs-1); font-weight:700; color:var(--done-text); margin-left:4px; }
 .goal .t-intent{ justify-items:start; text-align:left; max-width:none; margin:0 0 var(--s-3); padding:0 0 var(--s-3); }
@@ -2476,7 +2476,7 @@ function headEdit(el, ev){
 document.addEventListener('click', ev => { const el = ev.target.closest && ev.target.closest('[data-hedit]'); if (el) headEdit(el, ev); });
 function applyLabels(){
   const P = meta.project, ul = UNIT.toLowerCase(), ulp = unitPlural(UNIT).toLowerCase();
-  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  const set = (id, txt) => { const el = document.getElementById(id); if (el && !el.classList.contains('editing')) el.textContent = txt; }; /* étape 154 : jamais pendant qu'on modifie le titre à la main */
   set('brand-title', brandTitle()); set('brand-sub', brandSub()); document.title = appTitle();
   set('lbl-when', 'À la fin de chaque ' + ul);
   set('lbl-compare', P ? 'Comparatif entre les ' + ulp : 'Comparatif tous les 2 morceaux');
@@ -4480,7 +4480,7 @@ function crWeeksHtml(){ const W = {}; ALL.forEach(s => { const x = crOf(s.id); i
 function renderSuivi(){
   let realMin = 0, withJ = 0, planned = 0, doneN = 0;
   ALL.forEach(s => { const e = progress[s.id]; if (e && e.done){ doneN++; planned += s.duree * 60; } if (e && e.minutes) realMin += e.minutes; if (hasJournal(s.id)) withJ++; });
-  document.getElementById('journal-stats').innerHTML = '<p class="stat-line"><b>' + doneN + '/' + ALL.length + '</b> sessions faites · <b>' + Math.round(realMin / 6) / 10 + ' h</b> notées pour <b>' + Math.round(planned / 6) / 10 + ' h</b> prévues · <b>' + withJ + '</b> avec journal</p>' + crWeeksHtml(); /* étape 63 : une ligne au lieu de quatre cases */
+  document.getElementById('journal-stats').innerHTML = '<p class="stat-line"><b>' + doneN + '/' + ALL.length + '</b> sessions faites · <b>' + (fmtDur(Math.round(realMin)) || '0 min') + '</b> notées pour <b>' + (fmtDur(Math.round(planned)) || '0 min') + '</b> prévues · <b>' + withJ + '</b> avec journal</p>' + crWeeksHtml(); /* étape 63 : une ligne au lieu de quatre cases */
   const tracks = trackKeys(); if (tracks.indexOf(clTrack) < 0) clTrack = tracks[0] || 'M1'; if (tracks.indexOf(crTrack) < 0) crTrack = tracks[0] || 'M1';
   const opt = (tr, cr) => { const v = (meta.comparatif[tr] || {})[cr]; return '<select data-ct="' + tr + '" data-cc="' + esc(cr) + '" aria-label="' + esc(cr) + ' ' + tr + '"><option value="">–</option>' + [1,2,3,4,5].map(n => '<option' + (v === n ? ' selected' : '') + '>' + n + '</option>').join('') + '</select>'; };
   const avg = tr => { const vals = crItems().map(c => (meta.comparatif[tr] || {})[c]).filter(Boolean); return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : '–'; };
@@ -4715,7 +4715,7 @@ function renderRecap(){ const el = document.getElementById('week-recap'); if (!e
   el.innerHTML = '<div class="card recap"><div class="recap-h"><b>Ta semaine passée</b><span>' + shortD(parseISO(a)) + ' – ' + shortD(parseISO(b)) + '</span><button type="button" class="text-btn" data-recap-ok>Vu</button></div>' +
     '<div class="stat-grid">' + cell(h(mins) + (pmin ? '<small> / ' + h(pmin) + '</small>' : ''), 'Temps travaillé') + cell(done + '<small> / ' + plan.length + '</small>', 'Sessions faites') +
     cell(String(open), piste ? 'Problème' + (open > 1 ? 's' : '') + ' à régler · ' + esc(pName(piste)) : 'Problèmes à régler') + '</div>' +
-    (jal ? '<div class="recap-j">' + I.flag + ' <b>Prochain jalon</b> ' + esc(jal.jalon) + ' <span>· ' + esc(jal.jourAbbr + ' ' + jal.dateLabel) + '</span></div>' : '') + '</div>'; }
+    (jal ? '<div class="recap-j">' + I.flag + ' <b>Prochain jalon</b> ' + esc(jal.jalon) + ' <span class="rj-when">' + esc(jal.jourAbbr + ' ' + jal.dateLabel) + '</span></div>' : '') + '</div>'; }
 document.addEventListener('click', ev => { if (!(ev.target.closest && ev.target.closest('[data-recap-ok]'))) return; meta.recapSeen = weekMonday(new Date()); saveMeta(); renderRecap(); });
 function persistTimer(){ if (!T) { try{ localStorage.removeItem(LS_T); }catch{} return; } writeLS(LS_T, { fp:T.fp || null, started:!!T.started, id:T.id, key:T.key, jp:!!T.jp, startedAt:T.startedAt, rit:T.rit || null, add:T.add || null, idx:T.idx, remaining: remainingMs(), active:T.active, finished:T.finished, }); }
 /* étape 140 : « J'ai créé / J'ai tweaké » dans le journal (Résultat) : journal[id].crk = 'c' | 'r' | 'cr' ; le temps de la session va dans l'un, l'autre, ou moitié-moitié.
@@ -5105,7 +5105,7 @@ function restoreTimer(){
 /* ----- events ----- */
 function renderAll(){ NS_GEN++;
   const run = (name, f) => { try{ f(); }catch(e){ reportErr(name, e); } };
-  run('meta', migrateMeta); run('textes', applyEdits); run('calendrier', applySchedule); run('filtre', autoFilter); run('pause', renderPause); run('compteurs', renderMeters);
+  run('meta', migrateMeta); run('textes', applyEdits); run('calendrier', applySchedule); run('libellés', applyLabels); run('filtre', autoFilter); run('pause', renderPause); run('compteurs', renderMeters); /* étape 154 : le sous-titre (« 54h/morceau · 6h/sem. ») se recalcule après le calendrier : avant, il gardait les durées du modèle (63h) alors que les barres disaient 54h */
   run('formats', renderSplits); run('barres', fitLabels); run('prochaine session', renderNext); run('bilan de la semaine', renderRecap); run('semaines', renderWeeks); run('suivi', renderSuivi); }
 /* plusieurs onglets ouverts : quand un autre onglet enregistre, celui-ci se met à jour (sans interrompre une saisie ni un minuteur en marche) */
 let XTAB_T = 0;
@@ -5526,16 +5526,20 @@ async function showVersions(){
 /* sauvegarde en ligne immédiate quand la page se masque ou se ferme */
 function flushSaves(){ try{ if (AU_MO_T){ clearTimeout(AU_MO_T); AU_MO_T = 0; saveMeta(); } }catch(e){} /* étape 84 : texte d'un repère en cours de saisie */ flushLocal(); Object.keys(pendingSaves).forEach(p => { clearTimeout(timers[p]); const f = pendingSaves[p]; delete pendingSaves[p]; try{ f(); }catch(e){ console.error('synchronisation', p, e); } }); }
 /* page masquée ou de retour, page fermée : un seul écouteur pour chacun */
+/* retour sur l'onglet, ou sur la fenêtre de l'app (après avoir travaillé sur un autre appareil) : on récupère ce qui est plus récent ailleurs */
+/* jamais pendant qu'on travaille : minuteur ouvert, bibliothèque, panneau, fenêtre, saisie en cours ou session dépliée dans les semaines */
+function pullIfIdle(){
+  const busy = !document.getElementById('timer').hidden || document.getElementById('libovl') || document.querySelector('.povl:not([hidden])') || !document.getElementById('dialog').hidden
+    || !document.getElementById('settings').hidden || document.querySelector(OCCUPE) || (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName));
+  if (db && DBP && !busy && !Object.keys(pendingSaves).length && !(T && T.running) && Date.now() - lastPull >= 30000){ lastPull = Date.now(); initDbInner({ refresh:true }); }
+}
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden'){ flushSaves(); saveTicker(false); return; }
   saveTicker(true);
   if (T && T.running) keepAwake(true);
-  /* retour sur l'onglet (après avoir travaillé sur un autre appareil) : on récupère ce qui est plus récent ailleurs */
-  /* jamais pendant qu'on travaille : minuteur ouvert, bibliothèque, panneau, fenêtre, saisie en cours ou session dépliée dans les semaines */
-  const busy = !document.getElementById('timer').hidden || document.getElementById('libovl') || document.querySelector('.povl:not([hidden])') || !document.getElementById('dialog').hidden
-    || !document.getElementById('settings').hidden || document.querySelector(OCCUPE) || (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName));
-  if (db && DBP && !busy && !Object.keys(pendingSaves).length && !(T && T.running) && Date.now() - lastPull >= 30000){ lastPull = Date.now(); initDbInner({ refresh:true }); }
+  pullIfIdle();
 });
+window.addEventListener('focus', pullIfIdle); /* étape 154 : la fenêtre de l'app de bureau reste visible quand on passe à un autre appareil ; au retour du focus, elle se met à jour aussi */
 /* quitter la page : écritures en attente envoyées ; un mémo en cours d'enregistrement est gardé */
 addEventListener('online', () => Object.values(RETRY).forEach(r => { clearTimeout(r.t); r.f(); })); /* retour du réseau : les envois en attente partent tout de suite */
 window.addEventListener('pagehide', () => { flushSaves(); if (MEMO.rec) memoStop(true); });
