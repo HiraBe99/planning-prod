@@ -279,10 +279,6 @@ summary, select, label.check, label.switch, label.radio, label.plan-check, .chec
 .meter-mini-label span:first-child{ color:var(--text); font-weight:600; }
 .meter-mini-track{ display:block; height:4px; border-radius:var(--r-pill); background:var(--bg-panel-2); box-shadow:inset 0 0 0 1px var(--frame, var(--border)); overflow:hidden; }
 .meter-mini-fill{ display:block; height:100%; width:0%; border-radius:var(--r-pill); background:var(--accent); transition:width .7s cubic-bezier(.2,.8,.2,1); }
-/* étape 156 : les jalons du morceau, en repères sur la barre (atteint : entaille dans la couleur ; à venir : trait) ; leur texte au survol */
-.meter-mini-track{ position:relative; }
-.meter-j{ position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:var(--text-dim); opacity:.7; pointer-events:auto; }
-.meter-j.ok{ background:var(--bg-panel); opacity:1; }
 @media (max-width:520px){ .meter-grid{ grid-template-columns:repeat(3, minmax(0,1fr)); } }
 
 /* ----- cartes ----- */
@@ -3245,9 +3241,7 @@ function renderMeters(){
   const MK = BLOCKS.filter(k => k !== 'Tampon'), many = MK.length > 8, nsx = many ? nextSession() : null, curK = nsx && nsx.piste; /* étape 115 */
   document.getElementById('meter-grid').innerHTML = MK.map(k => {
     const tot = TN.perBlock[k] || 0, v = per[k] || 0;
-    let cum = 0, nJ = 0, okJ = 0; const ticks = tot ? ALL.filter(x => x.piste === k && !x.reserve).sort((a, b) => a.idx - b.idx).map(x => { cum += x.duree || 0; if (!x.jalon) return ''; nJ++; const ok = !!(progress[x.id] && progress[x.id].done); if (ok) okJ++; const pct = cum / tot * 100; if (pct > 99.5) return '';
-      return '<i class="meter-j' + (ok ? ' ok' : '') + '" style="left:' + pct.toFixed(1) + '%" title="' + esc(x.jalon) + (ok ? ' · atteint' : '') + '"></i>'; }).join('') : '';
-    return '<div class="meter-mini' + (many && k === curK ? ' cur' : '') + '" style="--g:' + Math.max(1, Math.round(tot)) + '"' + (nJ ? ' title="' + okJ + ' jalon' + (okJ > 1 ? 's' : '') + ' sur ' + nJ + '"' : '') + '><span class="meter-mini-label"><span>' + pShort(k) + '</span><span>' + rh(v) + '/' + rh(tot) + 'h</span></span><span class="meter-mini-track"><span class="meter-mini-fill" style="width:' + Math.min(100, tot ? v / tot * 100 : 0) + '%"></span>' + ticks + '</span></div>';
+    return '<div class="meter-mini' + (many && k === curK ? ' cur' : '') + '" style="--g:' + Math.max(1, Math.round(tot)) + '"><span class="meter-mini-label"><span>' + pShort(k) + '</span><span>' + rh(v) + '/' + rh(tot) + 'h</span></span><span class="meter-mini-track"><span class="meter-mini-fill" style="width:' + Math.min(100, tot ? v / tot * 100 : 0) + '%"></span></span></div>';
   }).join('');
   { const g = document.getElementById('meter-grid'); g.classList.toggle('many', many); const c = many && g.querySelector('.meter-mini.cur'); if (c) g.scrollLeft = Math.max(0, c.offsetLeft - (g.clientWidth - c.offsetWidth) / 2); }
 }
