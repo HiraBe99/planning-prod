@@ -1121,7 +1121,7 @@ input[type=range].sl.sl-sm{ height:var(--h-tag); }
 .set-sec + .set-sec{ border-top:1px solid var(--border); }
 .set-sec:last-child{ padding-bottom:0; }
 .set-sec > .f{ max-width:280px; }
-.set-sec > .f:has(.set-date){ max-width:none; }
+.set-sec > .f:has(.set-date), .set-sec > .f.slider{ max-width:none; }
 .set-date{ display:flex; gap:var(--s-3); align-items:center; flex-wrap:wrap; }
 .set-date input{ flex:0 1 280px; width:auto; min-width:180px; }
 @media (max-width:520px){ .set-date > *{ flex:1 1 100%; } } /* téléphone : champ et bouton l'un sous l'autre, pleine largeur */
@@ -1993,6 +1993,8 @@ button.s-jour.s-jour--guess{ color:var(--text-dim); font-style:italic; }
   summary .week-num, summary .week-date, summary .week-count, .key-chip b, .s-duree, .mini-lab span{ text-box:trim-both cap alphabetic; line-height:1; }
   @media (max-width:340px){ .week-card summary .week-date{ text-box:none; } } /* date abrégée avec « … » : rien ne doit être rogné */
 }
+/* étape 155 : au doigt, les boutons texte font 32 px de haut au moins */
+@media (pointer:coarse){ .text-btn, .pb-b, button.s-jour{ min-height:32px; } .pb-b{ padding:0 10px; } .text-btn, .pb-b{ display:inline-flex; align-items:center; } button.s-jour{ display:inline-flex; align-items:center; } }
 </style>
 </head>
 <body>
@@ -3722,7 +3724,7 @@ function applyFilterRaw(){
     const vs = c.querySelector('.view-switch');
     const canToggle = total > 1, fwk = isFocusWeek(w);
     c.querySelectorAll('[data-wtoggle]').forEach(o => { o.classList.toggle('togglable', canToggle);
-      o.title = canToggle ? (mode === 'jour' ? 'Afficher toute la semaine' : (fwk ? 'Revenir à la session du jour' : 'Afficher seulement cette session')) : ''; });
+      o.title = canToggle ? (mode === 'jour' ? 'Afficher toute la semaine' : (fwk ? 'Revenir à la session du jour' : 'Afficher seulement cette session')) : 'Cliquer pour renommer'; });
     if (vs){ vs.hidden = rows.length <= 1;
       const le = vs.querySelector('[data-lite]'); if (le){ le.classList.toggle('active', lite); le.setAttribute('aria-pressed', lite ? 'true' : 'false'); }
       const jb = vs.querySelector('[data-vmode="jour"]'); if (jb) jb.textContent = fwk ? 'Session du jour' : 'Cette session';
@@ -3933,7 +3935,7 @@ function journalPanelHtml(s){ const t = jTabDefault(s);
   return '<div class="jw-tabs"><div class="seg-ctl" role="group" aria-label="Avant ou après la session">' +
       '<button type="button" data-jtab="avant"' + (t === 'avant' ? ' class="on"' : '') + '>Préparer</button><button type="button" data-jtab="apres"' + (t === 'apres' ? ' class="on"' : '') + '>Bilan</button></div></div>' +
     '<div class="jw-pane" data-pane="avant"' + (t === 'avant' ? '' : ' hidden') + '>' + planEditHtml(s) + '</div>' +
-    '<div class="jw-pane" data-pane="apres"' + (t === 'apres' ? '' : ' hidden') + '>' + auPanelHtml(s) + memoBoxHtml(s) + journalFormHtml(s.id) + '</div>';
+    '<div class="jw-pane" data-pane="apres"' + (t === 'apres' ? '' : ' hidden') + '>' + auPanelHtml(s) + journalFormHtml(s.id) + '</div>';
 }
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-jtab]'); if (!b) return; const w = b.closest('.jwrap'); if (!w) return; const t = b.dataset.jtab;
   w.querySelectorAll('[data-jtab]').forEach(x => x.classList.toggle('on', x === b));
@@ -3950,10 +3952,10 @@ function journalFormHtml(id, opts){
     '<label class="f">Prochaine action concrète<textarea rows="1" class="grow" data-jf="prochaine" placeholder="La première chose à faire la prochaine fois">' + esc(j.prochaine) + '</textarea></label>' +
     '<div class="j-sec">Évaluation<button type="button" class="icon-btn fmt-more meth-edit" data-rk-edit aria-label="Modifier les éléments notés" title="Modifier les éléments notés"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><circle cx="4.5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15.5" cy="10" r="1.6"/></svg></button></div>' +
     '<div class="ratings">' + (rkFor(id).length ? '' : '<div class="res-empty">Aucun élément à noter : ajoute-les avec le bouton « … ».</div>') + rkFor(id).map(k => '<div class="rating-line"><span>' + esc(capTxt(k, 30)) + '</span><div class="dots">' + [1,2,3,4,5].map(n => '<button type="button" class="dot' + (r[k] === n ? ' on' : '') + (r[k] >= n ? ' fill' : '') + '" data-rk="' + esc(k) + '" data-rv="' + n + '" aria-label="' + esc(k) + ' ' + n + '">' + n + '</button>').join('') + '</div></div>').join('') + '</div>' +
-    (opts && opts.noMinutes ? '<div class="j-sec j-sec-notes"><span>Notes</span><span class="j-attach" data-ni="' + id + '">' + (niList(id).length < NI_MAX ? '<button type="button" class="ni-add" data-ni-add title="Ajouter une image (ou colle une capture dans les notes)">+ Image</button>' : '') + memoBoxHtml(BY_ID[id]) + '</span></div>' : '<div class="j-sec">Temps et notes</div>') +
+    '<div class="j-sec j-sec-notes"><span>' + (opts && opts.noMinutes ? 'Notes' : 'Temps et notes') + '</span><span class="j-attach" data-ni="' + id + '">' + (niList(id).length < NI_MAX ? '<button type="button" class="ni-add" data-ni-add title="Ajouter une image (ou colle une capture dans les notes)">+ Image</button>' : '') + memoBoxHtml(BY_ID[id]) + '</span></div>' +
     (opts && opts.noMinutes ? '' : '<label class="f">Temps réellement travaillé (min)<input type="text" data-dur data-pf="minutes" value="' + (e.minutes || '') + '" class="short" placeholder="min" title="Minutes, ou 1h30, 2h…"></label>') + (crTxt(id) && !(opts && opts.noMinutes) ? '<p class="cr-sum">' + esc(crTxt(id)) + '</p>' : '') +
     /* sous le titre « Notes » : le champ seul, qui grandit avec le texte */
-    (opts && opts.noMinutes ? '<label class="f"><textarea rows="1" class="grow" data-pf="notes" aria-label="Notes libres" placeholder="Idées, réglages à retenir, références…">' : '<label class="f">Notes libres<textarea rows="1" class="grow" data-pf="notes" placeholder="Idées, réglages à retenir, références…">') + esc(e.notes) + '</textarea></label>' + (opts && opts.noMinutes ? niHtml(id, 1).replace(/<button type="button" class="ni-add"[^>]*>\+ Image<\/button>/, '') : niHtml(id, 1)) + '</div>';
+    (opts && opts.noMinutes ? '<label class="f"><textarea rows="1" class="grow" data-pf="notes" aria-label="Notes libres" placeholder="Idées, réglages à retenir, références…">' : '<label class="f">Notes libres<textarea rows="1" class="grow" data-pf="notes" placeholder="Idées, réglages à retenir, références…">') + esc(e.notes) + '</textarea></label>' + niHtml(id, 1).replace(/<button type="button" class="ni-add"[^>]*>\+ Image<\/button>/, '') + '</div>';
 }
 function baseName(s){ const tn = s.free ? '' : trackName(s.piste), tr = s.free ? 'Libre' : (tn ? tn.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') || pShort(s.piste) : pShort(s.piste)), d = new Date((T && T.startedAt) || Date.now());
   /* parties séparées par un double « _ » (date__morceau__bloc__heure) : bien distinctes des « - » entre les mots, accepté partout */
@@ -4052,7 +4054,7 @@ function planStepsHtml(s, p){ const last = p.etapes.reduce((a, e, i) => e.trim()
     Array.from({ length:n }, (_, i) => '<div class="pe-row"><span class="pe-ic num">' + (i + 1) + '</span><textarea rows="1" class="grow" data-pl="e' + i + '" placeholder="Étape ' + (i + 1) + '">' + esc(p.etapes[i]) + '</textarea></div>').join('') + '</div></div>'; }
 function planEditHtml(s, inGoal){
   const p = getPlan(s.id);
-  return '<div class="plan pe" data-pid="' + s.id + '"><div class="plan-lbl plan-lbl--ai">Ton plan<button type="button" class="ai-plan" data-aiplan="' + s.id + '"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l1.7 4.6L16 8.3l-4.3 1.7L10 14.6 8.3 10 4 8.3l4.3-1.7z"/><path d="M15.5 12.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg><span>Proposer un plan</span></button>' + (PLAN_UNDO[s.id] ? planUndoBtn(s.id) : '') + '</div><div class="ai-panel" hidden></div>' +
+  return '<div class="plan pe" data-pid="' + s.id + '"><div class="plan-lbl plan-lbl--ai">Ton plan' + (T && T.started && T.id === s.id ? '' : '<button type="button" class="ai-plan" data-aiplan="' + s.id + '"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l1.7 4.6L16 8.3l-4.3 1.7L10 14.6 8.3 10 4 8.3l4.3-1.7z"/><path d="M15.5 12.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg><span>Proposer un plan</span></button>') + (PLAN_UNDO[s.id] ? planUndoBtn(s.id) : '') + '</div><div class="ai-panel" hidden></div>' +
     (inGoal ? '' : '<div class="pe-sec" role="group" aria-label="Ton but">' +
       '<div class="pe-row"><span class="pe-ic">' + I.flag + '</span><textarea rows="1" class="grow plan-title" data-pl="titre" placeholder="Ton but, en une phrase">' + esc(p.titre) + '</textarea></div>' +
       '</div>') +
@@ -4476,7 +4478,7 @@ let clEditing = false;
 function crWeeksHtml(){ const W = {}; ALL.forEach(s => { const x = crOf(s.id); if (!x || !s.date) return; const d = parseISO(s.date), mon = isoOf(addDays(d, -((d.getDay() + 6) % 7)));
     const w = W[mon] = W[mon] || { c:0, r:0 }; w.c += x.c; w.r += x.r; });
   const ks = Object.keys(W).filter(k => W[k].c + W[k].r > 0).sort().slice(-8); if (!ks.length) return '';
-  return '<p class="stat-line cr-weeks">Créé : ' + ks.map(k => '<span>sem. du ' + esc(shortD(parseISO(k))) + ' <b>' + Math.round(100 * W[k].c / (W[k].c + W[k].r)) + ' %</b></span>').join(' · ') + '</p>'; }
+  return '<p class="stat-line cr-weeks">Temps créé / tweaké : ' + ks.map(k => '<span>sem. du ' + esc(shortD(parseISO(k))) + ' <b>' + Math.round(100 * W[k].c / (W[k].c + W[k].r)) + ' % créé</b></span>').join(' · ') + '</p>'; }
 function renderSuivi(){
   let realMin = 0, withJ = 0, planned = 0, doneN = 0;
   ALL.forEach(s => { const e = progress[s.id]; if (e && e.done){ doneN++; planned += s.duree * 60; } if (e && e.minutes) realMin += e.minutes; if (hasJournal(s.id)) withJ++; });
@@ -4943,7 +4945,7 @@ function renderTimer(){
   if (st.prod && blockKwHtml().indexOf('kw-empty') < 0) extra += '<details class="ifthen-box"><summary>Bloqué ? Pioche un rôle de ta bibliothèque</summary>' + blockKwHtml() + '</details>'; /* étape 150 : rien tant que la bibliothèque n'a pas de rôles */ /* étape 63 : à la place des plans si-alors, les mots-clés (rôles) de ta bibliothèque ; un clic l'ouvre sur ce mot-clé */
   const nxt = T.steps[T.idx + 1];
   if (!s.free && T.started && !T.editPlan && !T.planShut && !(st.role === 'notes' || st.journal)){ const p0 = getPlan(s.id); if (!p0.etapes.some(e => e.trim()) && !p0.criteres.some(c => c.trim())) T.editPlan = true; } /* étapes et critères ouverts par défaut tant qu'ils sont vides */
-  const planning = !s.free && (!T.started || T.editPlan || (st.role === 'obj' && !T.planShut)); /* étape 83 : à l'étape Objectif, ton but et tes critères s'ouvrent pour être relus ou réécrits ; le plan s'écrit avant le lancement ; ensuite il devient une liste à cocher (« Modifier le plan » reste possible) */
+  const planning = !s.free && (!T.started || T.editPlan); /* étape 155 : même carte à toutes les étapes (liste à cocher, « ··· » pour modifier) ; avant : à l'étape Objectif elle s'ouvrait en formulaire */ /* étape 83 : à l'étape Objectif, ton but et tes critères s'ouvrent pour être relus ou réécrits ; le plan s'écrit avant le lancement ; ensuite il devient une liste à cocher (« Modifier le plan » reste possible) */
   let goal = '';
   if (!s.free && !s.extra){ /* les sessions rapides vont droit au travail : pas de cadre « But de la session » */
     const p = getPlan(s.id);
@@ -6018,6 +6020,8 @@ function init(){
     const vm = ev.target.closest('[data-vmode]'); if (vm){ setWeekMode(+vm.dataset.vweek, vm.dataset.vmode); return; }
     const wt = ev.target.closest('[data-wtoggle]');
     if (wt && ev.target.closest('.s-name.editing')) return; /* clic dans le nom en cours de modification : rien d'autre */
+    { const nm0 = wt && !wt.classList.contains('togglable') && ev.target.closest('.s-name'); /* étape 155 : une seule session visible dans la semaine : le clic sur le titre la renomme */
+      if (nm0 && !nm0.classList.contains('editing') && ev.button <= 0 && BY_ID[nm0.dataset.bid] && !BY_ID[nm0.dataset.bid].extra){ const sel = getSelection(); if (!(sel && !sel.isCollapsed && nm0.contains(sel.anchorNode))) blocEdit(nm0, caretOffsetAt(nm0, ev.clientX, ev.clientY)); return; } }
     if (wt && wt.classList.contains('togglable')){ clearTimeout(WT_T); WT_T = 0; if (wt.querySelector('.s-name.editing')) return; /* chaque clic bascule, même rapprochés : le nom reste sous le curseur */
       /* un clic sur le nom = une seule action : basculer jour / semaine, tout de suite, le titre restant sous le curseur
  (renommer : crayon de la session, ou clic sur le nom dans la carte « prochaine session ») */
