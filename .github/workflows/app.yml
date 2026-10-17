@@ -22,7 +22,7 @@ jobs:
             targets: ''
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: La page du site dans l'app
         shell: bash
         run: |
@@ -32,7 +32,7 @@ jobs:
         env:
           DESK_CLIENT_ID: ${{ secrets.DESK_CLIENT_ID }}
           DESK_CLIENT_SECRET: ${{ secrets.DESK_CLIENT_SECRET }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with: { node-version: 22 }
       - uses: dtolnay/rust-toolchain@stable
         with: { targets: '${{ matrix.targets }}' }

@@ -107,7 +107,7 @@ try{ var th = JSON.parse(localStorage.getItem('dnb-theme-applied') || 'null'); i
 /* étape 131 : Circuit, cadres des étiquettes de la carte principale 2 points plus nets (morceau, tonalité, notes, Essentiel) */
 html:root[data-theme="circuit"] .next .piste-tag{ box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--hero-ink) 57%, transparent); }
 html:root[data-theme="circuit"] .next .key-chip{ box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--hero-ink) 62%, transparent); }
-html:root[data-theme="circuit"] .next .key-chip .chord{ box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--hero-ink) 77%, transparent); }
+html:root[data-theme="circuit"] .next .key-chip .chord{ border-color:color-mix(in srgb, var(--hero-ink) 77%, transparent); }
 html:root[data-theme="circuit"] .next .s-ess{ box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--hero-ink) 72%, transparent); }
 :root[data-theme="circuit"] .week-card.is-current{ box-shadow:0 0 0 1px rgba(142,216,255,.85), 0 0 36px rgba(110,200,255,.16); }
 :root[data-theme="circuit"]{ --title-hover:#A9E3FF; } /* bleu glacier : le givre du titre (#D5E3EC) se colore nettement au survol, sans chaleur */
@@ -1776,7 +1776,7 @@ body::before{ content:''; position:fixed; inset:0; z-index:-1; pointer-events:no
 .key-notes > .deg-35, .key-notes > .deg-1{ color:var(--text); font-weight:700; opacity:1; }
 .key-notes > .deg-35{ background:color-mix(in srgb, var(--text) 24%, transparent); } /* surbrillance (au choix, tierce et quinte comprises : leur contour reste) */
 /* tierce et quinte : contour plein, toujours visible, même quand toutes les notes sont mises en avant */
-.key-notes > .chord{ color:var(--text); font-weight:700; opacity:1; box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--text) 75%, transparent); }
+.key-notes > .chord{ color:var(--text); font-weight:700; opacity:1; box-sizing:border-box; border:1.5px solid color-mix(in srgb, var(--text) 75%, transparent); } /* vrai bord (et non une ombre intérieure) : Safari / app Mac assombrissait le coin haut gauche */
 .key-notes > .deg-1{ background:var(--text); color:var(--bg-panel); }
 /* la fondamentale n'a pas de marque à part : elle est la 1re note de la gamme et nommée par la tonalité juste à gauche */
 .key-chip .acc{ position:relative; top:-.3em; margin-left:1px; font-family:system-ui, -apple-system, 'Segoe UI Symbol', 'Apple Symbols', sans-serif; font-size:.9em; font-weight:inherit; line-height:0; }
