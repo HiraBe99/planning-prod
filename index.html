@@ -181,6 +181,12 @@ input[type=checkbox], input[type=radio]{ accent-color:var(--accent); width:18px;
 .btn-primary{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
 .btn-primary:hover{ background:var(--accent); border-color:var(--accent); filter:brightness(1.08); }
 .btn-soft{ background:transparent; border-color:var(--accent); color:var(--accent-text); }
+/* étape 156 : bouton qui efface ou remplace : couleur danger (fenêtres Vider, Remplacer, Supprimer…) */
+.btn-danger.btn-primary{ background:var(--danger); border-color:var(--danger); color:var(--on-danger, #fff); }
+.btn-danger.btn-primary:hover{ background:var(--danger); border-color:var(--danger); filter:brightness(1.08); }
+.dlg-btns .btn-danger.btn-primary{ box-shadow:0 2px 10px color-mix(in srgb, var(--danger) 28%, transparent); }
+.btn-danger:not(.btn-primary){ color:var(--danger-text); border-color:color-mix(in srgb, var(--danger) 60%, var(--frame, var(--border))); }
+.btn-danger:not(.btn-primary):hover{ background:var(--danger-soft); border-color:var(--danger); }
 .btn-soft:hover{ background:var(--accent-soft); border-color:var(--accent); }
 .big-start, .next .btn, .povl-foot .btn, .dlg-btns .btn{ min-height:var(--h-3); font-size:var(--fs-3); padding:0 24px; }
 .big-start.btn-primary, .next .btn-primary, .povl-foot .btn-primary, .dlg-btns .btn-primary{ box-shadow:0 2px 10px color-mix(in srgb, var(--accent) 28%, transparent); font-weight:700; }
@@ -273,6 +279,10 @@ summary, select, label.check, label.switch, label.radio, label.plan-check, .chec
 .meter-mini-label span:first-child{ color:var(--text); font-weight:600; }
 .meter-mini-track{ display:block; height:4px; border-radius:var(--r-pill); background:var(--bg-panel-2); box-shadow:inset 0 0 0 1px var(--frame, var(--border)); overflow:hidden; }
 .meter-mini-fill{ display:block; height:100%; width:0%; border-radius:var(--r-pill); background:var(--accent); transition:width .7s cubic-bezier(.2,.8,.2,1); }
+/* étape 156 : les jalons du morceau, en repères sur la barre (atteint : entaille dans la couleur ; à venir : trait) ; leur texte au survol */
+.meter-mini-track{ position:relative; }
+.meter-j{ position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:var(--text-dim); opacity:.7; pointer-events:auto; }
+.meter-j.ok{ background:var(--bg-panel); opacity:1; }
 @media (max-width:520px){ .meter-grid{ grid-template-columns:repeat(3, minmax(0,1fr)); } }
 
 /* ----- cartes ----- */
@@ -2716,8 +2726,8 @@ async function gdMenuClick(){
   if (!GD.st.on){ gdConnect(); return; }
   if (gdNeed()){ gdConnect(); return; }
   const v = await askDialog('Google Drive', GD.st.email || '', [{ label:'Synchroniser maintenant', value:'s', primary:true }, { label:'Récupérer le Drive ici', value:'r' }, { label:'Remplacer le Drive par cet appareil', value:'f' }, { label:'Déconnecter', value:'d' }, { label:'Fermer', value:null }]);
-  if (v === 'r' && await askDialog('Récupérer le Drive ici ?', 'Le planning de cet appareil est remplacé par celui du Drive. Une copie de secours est faite avant.', [{ label:'Récupérer', value:true, primary:true }, { label:'Annuler', value:false }])) await takeRemote();
-  if (v === 'f' && await askDialog('Remplacer le Drive par cet appareil ?', 'Les autres appareils recevront le planning de celui-ci. Une copie de secours est faite avant.', [{ label:'Remplacer', value:true, primary:true }, { label:'Annuler', value:false }])) await forceThisDevice();
+  if (v === 'r' && await askDialog('Récupérer le Drive ici ?', 'Le planning de cet appareil est remplacé par celui du Drive. Une copie de secours est faite avant.', [{ label:'Récupérer', value:true, primary:true, danger:true }, { label:'Annuler', value:false }])) await takeRemote();
+  if (v === 'f' && await askDialog('Remplacer le Drive par cet appareil ?', 'Les autres appareils recevront le planning de celui-ci. Une copie de secours est faite avant.', [{ label:'Remplacer', value:true, primary:true, danger:true }, { label:'Annuler', value:false }])) await forceThisDevice();
   if (v === 's'){ flushSaves(); lastPull = Date.now(); saveState('sync'); await initDbInner({ refresh:true }); if (!Object.keys(pendingSaves).length && !Object.keys(RETRY).length) saveState('ok'); }
   if (v === 'd'){ flushSaves(); try{ if (DESK && (GD.st.rt || GD.st.tok)) gfetch('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(GD.st.rt || GD.st.tok), { method:'POST' }).catch(() => {}); else if (GD.st.tok && window.google) window.google.accounts.oauth2.revoke(GD.st.tok, () => {}); }catch(e){}
     GD.st = { email:GD.st.email }; gdSaveSt(); GD.ids = {}; GD.cache = {}; db = null; DBP = null; saveState('local'); gdMenu(); toast('Google Drive déconnecté : tout reste sur cet appareil'); } }
@@ -2987,7 +2997,7 @@ async function initDbInner(opts){
     if (p.exists && !(opts && opts.force)){ const rd = clean(p.data()), rt = (rd.__depuis || {})._t || 0, lt = (progress.__depuis || {})._t || 0;
       const perdu = rt > lt ? Object.keys(progress).filter(k => k !== '__depuis' && isObj(progress[k]) && progress[k].done && (progress[k]._t || 0) < rt && !(isObj(rd[k]) && rd[k].done)).length : 0;
       if (perdu >= 3){ /* étape 148 : un autre appareil a remis le planning à zéro : rien n'est effacé ici sans accord */
-        const v = await askDialog('Planning remis à zéro ailleurs', 'Un autre appareil a remis le planning à zéro. Sur cet appareil, ' + perdu + ' sessions faites seraient effacées.', [{ label:'Garder cet appareil', value:'keep', primary:true }, { label:'Accepter la remise à zéro', value:'ok' }]);
+        const v = await askDialog('Planning remis à zéro ailleurs', 'Un autre appareil a remis le planning à zéro. Sur cet appareil, ' + perdu + ' sessions faites seraient effacées.', [{ label:'Garder cet appareil', value:'keep', primary:true }, { label:'Accepter la remise à zéro', value:'ok', danger:true }]);
         if (v !== 'ok'){ if (DB_DONE) setTimeout(() => forceThisDevice(rt), 0); else INIT_FORCE = rt; return; } } }
     if (p.exists){ avantFusion(); const d = clean(p.data()); delete d._ts; progress = fusionProg(progress, d, newer(p, 'progress/state')); if (JSON.stringify(progress) !== JSON.stringify(d)) upLater('progress/state', () => progress); } else if (tsMap['progress/state']) upLater('progress/state', () => progress);
     if (m.exists){ const md = clean(m.data()), old = meta; meta = fusionMeta(meta, md, newer(m, 'meta/suivi')); vuMeta(); if (JSON.stringify(cheminsMeta(meta)) !== JSON.stringify(cheminsMeta(md))) upLater('meta/suivi', () => meta); meta.comparatif = meta.comparatif || {}; meta.checklist = meta.checklist || {}; meta.overrides = meta.overrides || {}; if (!Array.isArray(meta.shifts)) meta.shifts = []; if (typeof meta.resumeIdx !== 'number') meta.resumeIdx = -1; if (!meta.settings && old.settings) meta.settings = old.settings; if (meta.prefs) applyPrefsObj(meta.prefs); }
@@ -3235,7 +3245,9 @@ function renderMeters(){
   const MK = BLOCKS.filter(k => k !== 'Tampon'), many = MK.length > 8, nsx = many ? nextSession() : null, curK = nsx && nsx.piste; /* étape 115 */
   document.getElementById('meter-grid').innerHTML = MK.map(k => {
     const tot = TN.perBlock[k] || 0, v = per[k] || 0;
-    return '<div class="meter-mini' + (many && k === curK ? ' cur' : '') + '" style="--g:' + Math.max(1, Math.round(tot)) + '"><span class="meter-mini-label"><span>' + pShort(k) + '</span><span>' + rh(v) + '/' + rh(tot) + 'h</span></span><span class="meter-mini-track"><span class="meter-mini-fill" style="width:' + Math.min(100, tot ? v / tot * 100 : 0) + '%"></span></span></div>';
+    let cum = 0, nJ = 0, okJ = 0; const ticks = tot ? ALL.filter(x => x.piste === k && !x.reserve).sort((a, b) => a.idx - b.idx).map(x => { cum += x.duree || 0; if (!x.jalon) return ''; nJ++; const ok = !!(progress[x.id] && progress[x.id].done); if (ok) okJ++; const pct = cum / tot * 100; if (pct > 99.5) return '';
+      return '<i class="meter-j' + (ok ? ' ok' : '') + '" style="left:' + pct.toFixed(1) + '%" title="' + esc(x.jalon) + (ok ? ' · atteint' : '') + '"></i>'; }).join('') : '';
+    return '<div class="meter-mini' + (many && k === curK ? ' cur' : '') + '" style="--g:' + Math.max(1, Math.round(tot)) + '"' + (nJ ? ' title="' + okJ + ' jalon' + (okJ > 1 ? 's' : '') + ' sur ' + nJ + '"' : '') + '><span class="meter-mini-label"><span>' + pShort(k) + '</span><span>' + rh(v) + '/' + rh(tot) + 'h</span></span><span class="meter-mini-track"><span class="meter-mini-fill" style="width:' + Math.min(100, tot ? v / tot * 100 : 0) + '%"></span>' + ticks + '</span></div>';
   }).join('');
   { const g = document.getElementById('meter-grid'); g.classList.toggle('many', many); const c = many && g.querySelector('.meter-mini.cur'); if (c) g.scrollLeft = Math.max(0, c.offsetLeft - (g.clientWidth - c.offsetWidth) / 2); }
 }
@@ -3657,7 +3669,7 @@ function weekHtml(w, open){
   const closed = !cur && vis.length > 0 && done === vis.length;
   return '<details class="week-card' + (cur ? ' is-current' : '') + (closed ? ' is-closed' : '') + '" data-week="' + w.week + '" data-piste="' + w.piste + '"' + (cur ? ' open' : '') + '>' +
     '<summary><span class="week-num">S' + w.week + '</span><span class="week-date">' + esc(w.dateLabel) + '</span><span class="wk-tags"><span class="wk-slot wk-s-tag"><span class="piste-tag' + (w.piste === 'Tampon' ? ' piste-tag--buffer' : ' tname') + '"' + (w.piste === 'Tampon' ? '' : ' data-tname-inline="' + esc(pNum(w.piste)) + '" tabindex="0" title="Renommer ce ' + esc(UNIT.toLowerCase()) + ' (clic)"') + '>' + esc(pName(w.piste)) + '</span></span><span class="wk-slot wk-s-key">' + keyChip(w.piste, false) + '</span>' +
-    (cur ? '<span class="badge-now">' + (todayISO() < w.dateStart ? 'À venir' : 'Cette semaine') + '</span>' : '') + '</span>' +
+    (cur ? '<span class="badge-now">' + (todayISO() < w.dateStart && !w.sessions.some(x => x.date && x.date <= todayISO() && !(progress[x.id] && progress[x.id].done)) ? 'À venir' : 'Cette semaine') + '</span>' : '') /* étape 156 : une session de la semaine déplacée à aujourd'hui : « Cette semaine », pas « À venir » */ + '</span>' +
     '<span class="week-progress"><span class="week-progress-fill" style="width:' + (done / vis.length * 100) + '%"></span></span><span class="week-count">' + done + '/' + vis.length + '</span>' + I.chev + '</summary>' +
     '<div class="view-switch" data-vw="' + w.week + '" hidden><div class="seg-ctl" role="group" aria-label="Affichage de la semaine">' +
       '<button type="button" data-vmode="jour" data-vweek="' + w.week + '">Session du jour</button><button type="button" data-vmode="semaine" data-vweek="' + w.week + '">Semaine</button></div><button type="button" class="chip vs-ess" data-lite aria-pressed="false" title="N\'afficher que les sessions essentielles">Essentiel</button></div>' +
@@ -3829,7 +3841,7 @@ function createExtra(){
 }
 async function deleteExtra(id){
   const s = BY_ID[id]; if (!s) return;
-  const ok = await askDialog('Supprimer cette session ?', 'La session rapide « ' + (s.objectif === PLACEHOLDER_OBJ ? s.bloc : s.objectif) + ' » et son journal seront supprimés.', [ { label:'Supprimer', value:true, primary:true }, { label:'Annuler', value:false } ]);
+  const ok = await askDialog('Supprimer cette session ?', 'La session rapide « ' + (s.objectif === PLACEHOLDER_OBJ ? s.bloc : s.objectif) + ' » et son journal seront supprimés.', [ { label:'Supprimer', value:true, primary:true, danger:true }, { label:'Annuler', value:false } ]);
   if (!ok) return;
   const snap = takeSnapshot('Avant suppression d\'une session rapide');
   planLog('Session supprimée : ' + s.bloc + ' (' + dayShort(s.date) + ')'); meta.extras = extrasList().filter(e => e.id !== id); delete progress[id]; saveProgress();
@@ -3875,7 +3887,7 @@ function wipeProgress(){
 /* Tout vider : même structure, mais tous les textes paramétrables sont vides */
 async function resetPlanning(){
   const ok = await askDialog('Vider le planning ?', 'Ta structure est gardée (morceaux, semaines, blocs, formats, dates), mais tous les textes sont vidés : objectifs, tests, sous-titre, checklist, critères du comparatif, éléments notés et rappels (la sauvegarde du projet reste) ; tes sessions rapides sont supprimées. Ton logiciel de musique est gardé. Ta progression et ton journal sont effacés. Tu pourras annuler juste après.', [
-    { label:'Oui, tout vider', value:true, primary:true }, { label:'Annuler', value:false } ]);
+    { label:'Oui, tout vider', value:true, primary:true, danger:true }, { label:'Annuler', value:false } ]);
   if (!ok) return;
   const snap = takeSnapshot('Avant « Vider le planning »');
   const P = JSON.parse(JSON.stringify(meta.project || demoProject()));
@@ -3889,7 +3901,7 @@ async function resetPlanning(){
 /* Réglages par défaut : textes et paramètres d'origine */
 async function resetEverything(){
   const ok = await askDialog('Revenir au modèle d\'origine ?', 'Le projet D&B d\'origine revient avec tous ses textes et paramètres : structure, objectifs, checklist, comparatif, formats, règles et dates. Ta progression et ton journal sont effacés. Ton thème est conservé. Tu pourras annuler juste après.', [
-    { label:'Oui, revenir au modèle', value:true, primary:true }, { label:'Annuler', value:false } ]);
+    { label:'Oui, revenir au modèle', value:true, primary:true, danger:true }, { label:'Annuler', value:false } ]);
   if (!ok) return;
   const snap = takeSnapshot('Avant « Revenir au modèle d\'origine »');
   wipeProgress();
@@ -4803,7 +4815,7 @@ function askDialog(title, text, buttons){
   return new Promise(res => {
     const el = document.getElementById('dialog');
     el.innerHTML = '<div class="dlg-box" role="dialog" aria-modal="true"><h3>' + esc(title) + '</h3>' + (text ? '<p>' + esc(text) + '</p>' : '') +
-      '<div class="dlg-btns">' + buttons.map((b, i) => '<button type="button" class="btn' + (b.primary ? ' btn-primary' : '') + '" data-dlg="' + i + '">' + esc(b.label) + '</button>').join('') + '</div></div>';
+      '<div class="dlg-btns">' + buttons.map((b, i) => '<button type="button" class="btn' + (b.primary ? ' btn-primary' : '') + (b.danger ? ' btn-danger' : '') + '" data-dlg="' + i + '">' + esc(b.label) + '</button>').join('') + '</div></div>';
     el.hidden = false;
     const done = v => { el.hidden = true; el.innerHTML = ''; el.onclick = null; document.removeEventListener('keydown', onKey); res(v); };
     const onKey = e => { if (e.key === 'Escape') done(null); };
@@ -4823,7 +4835,7 @@ async function resetTimer(){
   if (!T || T.finished) return;
   const mins = Math.round(T.active / 60000);
   const v = await askDialog('Remettre le minuteur à zéro ?', (mins > 0 ? mins + ' min travaillées ne seront pas comptées. ' : '') + 'La session repart de la première étape ; ton but, ton plan et tes cases cochées sont conservés.', [
-    { label: 'Remettre à zéro', value: true, primary: true }, { label: 'Annuler', value: false } ]);
+    { label: 'Remettre à zéro', value: true, primary: true, danger: true }, { label: 'Annuler', value: false } ]);
   if (!v || !T) return;
   clearInterval(tick); keepAwake(false);
   /* remise à zéro : les étapes reprennent leur durée prévue (les « +5 min » sont oubliés) */
@@ -4862,7 +4874,7 @@ async function stopTimer(){
     if (mins > 0){
       const v = await askDialog('Arrêter la session ?', mins + ' min travaillées. La session ne sera pas cochée.', [
         { label: 'Garder les minutes et fermer', value: 'keep', primary: true },
-        { label: 'Fermer sans enregistrer', value: 'drop' },
+        { label: 'Fermer sans enregistrer', value: 'drop', danger: true },
         { label: 'Continuer la session', value: null } ]);
       if (!v || !T) return;
       if (v === 'keep'){ addMinutes(T.id, mins); saveProgress(); refreshWeek(BY_ID[T.id].week); renderSuivi(); }
@@ -5251,7 +5263,7 @@ async function applyProject(){
   if (!PD) return; const P = normalizeProject(PD); const dawPick = P.daw; delete P.daw;
   const cur = meta.project ? sigOf(meta.project) : SIG_DEMO, change = sigOf(P) !== cur;
   if (change && hasSessionData()){
-    const ok = await askDialog('Changer la structure ?', 'Le nombre de cycles ou de semaines change : l\'état des sessions, le journal et les plans seront effacés. Les textes de ton projet sont conservés.', [ { label:'Oui, appliquer', value:true, primary:true }, { label:'Revenir à la configuration', value:false } ]);
+    const ok = await askDialog('Changer la structure ?', 'Le nombre de cycles ou de semaines change : l\'état des sessions, le journal et les plans seront effacés. Les textes de ton projet sont conservés.', [ { label:'Oui, appliquer', value:true, primary:true, danger:true }, { label:'Revenir à la configuration', value:false } ]);
     if (!ok) return;
   }
   const snap = changerProjet(change, 'Avant modification du projet');
@@ -5265,7 +5277,7 @@ function projetChange(msg, snap){ saveMeta(true); loadProject(); afterProjectCha
 async function loadDemoProject(){
   const cur = meta.project ? sigOf(meta.project) : SIG_DEMO, change = cur !== SIG_DEMO;
   if (meta.project || (change && hasSessionData())){
-    const ok = await askDialog('Remettre le projet par défaut ?', 'Remplace la structure et les textes de ton projet par la configuration d\'origine (Drum & Bass).' + (change && hasSessionData() ? ' L\'état des sessions, le journal et les plans seront effacés.' : ''), [ { label:'Oui, remettre par défaut', value:true, primary:true }, { label:'Annuler', value:false } ]);
+    const ok = await askDialog('Remettre le projet par défaut ?', 'Remplace la structure et les textes de ton projet par la configuration d\'origine (Drum & Bass).' + (change && hasSessionData() ? ' L\'état des sessions, le journal et les plans seront effacés.' : ''), [ { label:'Oui, remettre par défaut', value:true, primary:true, danger:true }, { label:'Annuler', value:false } ]);
     if (!ok) return;
   }
   const snap = changerProjet(change, 'Avant retour au projet par défaut');
@@ -7439,7 +7451,7 @@ async function auAdd(sid, slot, file, opts){
   { const A0 = auMeta(), nm = capTxt(file.name, 80), dup = Object.keys(A0.items).find(k => k !== old && isObj(A0.items[k]) && !A0.items[k].memo && A0.items[k].n === nm && A0.items[k].sz === file.size);
     if (dup){ if (AU.has[dup] === false || (AU.has[dup] === undefined && !(await auGetRec(dup)))){ try{ const buf = await auDecode(await file.arrayBuffer()); if (buf){ await auPut(dup, { blob:file, peaks:auPeaks(buf) }); AU.has[dup] = true; } }catch{} }
       auLink(sid, slot, dup); if (old && old !== dup) await auForget(old); saveMeta(); auRenderAll(sid); return; } }
-  if (old && oldIt && !(opts && opts.noAsk)){ const v = await askDialog('Remplacer le fichier ?', '« ' + oldIt.n + ' » sera remplacé par « ' + file.name + ' ».', [{ label:'Remplacer', value:1, primary:true }, { label:'Annuler', value:0 }]); if (!v) return; }
+  if (old && oldIt && !(opts && opts.noAsk)){ const v = await askDialog('Remplacer le fichier ?', '« ' + oldIt.n + ' » sera remplacé par « ' + file.name + ' ».', [{ label:'Remplacer', value:1, primary:true, danger:true }, { label:'Annuler', value:0 }]); if (!v) return; }
   const key = sid + ':' + slot; AU.busy[key] = 'Analyse…'; auRenderAll(sid);
   try{
     const ab = await file.arrayBuffer(), info = auProbe(ab, file.name, file.type), buf = await auDecode(ab);
@@ -9794,7 +9806,7 @@ document.addEventListener('click', ev => {
     Object.keys(AU_REFS).forEach(sl => Object.keys(A[AU_REFS[sl]]).forEach(p => { if (A[AU_REFS[sl]][p] === aid) uses.push({ sl, p }); }));
     askDialog('Retirer de la bibliothèque ?', '« ' + libName(it) + ' » sera retiré de ta bibliothèque, sur tous tes appareils' + (n === 1 ? ', avec son repère' : n ? ', avec ses ' + n + ' repères' : '') + '. « Annuler » juste après le remet (le fichier est gardé 30 jours).' +
         (uses.length ? ' Il sert de ' + uses.map(u => AU_SLOTS[u.sl] + ' pour « ' + pName(u.p) + ' »').join(', ') + ' : ' + (uses.length > 1 ? 'ces cases seront vidées.' : 'cette case sera vidée.') : ''),
-        [{ label:'Retirer', value:1, primary:true }, { label:'Annuler', value:0 }])
+        [{ label:'Retirer', value:1, primary:true, danger:true }, { label:'Annuler', value:0 }])
       .then(v => { if (!v) return; const snap = takeSnapshot('Avant retrait de « ' + libName(it) + ' »'); if (AU.cur && AU.cur.aid === aid) auStop(false); if (LIB.open === aid) LIB.open = null;
         uses.forEach(u => { delete A[AU_REFS[u.sl]][u.p]; }); it.lib = false; it.mo = [];
         auForget(aid).then(() => { saveMeta(); libRender(); document.querySelectorAll('.au[data-au]').forEach(auRender); undoToast('Retiré de la bibliothèque', snap); }); }); return; }
@@ -9802,7 +9814,7 @@ document.addEventListener('click', ev => {
     const refd = new Set(); Object.values(AU_REFS).forEach(k => Object.values(isObj(A[k]) ? A[k] : {}).forEach(a => refd.add(a))); const nR = aids.filter(a => refd.has(a)).length, nT = aids.length;
     askDialog('Vider la bibliothèque ?', nT + ' morceau' + (nT > 1 ? 'x' : '') + ' et leurs repères seront retirés, sur tous tes appareils. Une copie de secours est faite avant et les fichiers sont gardés 30 jours : « Revenir en arrière » (menu ⋯) les rend.' +
         (nR ? ' ' + nR + (nR > 1 ? ' servent' : ' sert') + ' de Réf. pour tes morceaux : tu peux ' + (nR > 1 ? 'les' : 'le') + ' garder.' : ''),
-        nR ? [{ label:'Garder mes Réf.', value:1, primary:true }, { label:'Tout vider', value:2 }, { label:'Annuler', value:0 }] : [{ label:'Vider', value:2, primary:true }, { label:'Annuler', value:0 }])
+        nR ? [{ label:'Garder mes Réf.', value:1, primary:true }, { label:'Tout vider', value:2, danger:true }, { label:'Annuler', value:0 }] : [{ label:'Vider', value:2, primary:true, danger:true }, { label:'Annuler', value:0 }])
       .then(async v => { if (!v) return; takeSnapshot('Avant vidage de la bibliothèque'); if (AU.cur) auStop(false); if (DRONE.aid) droneStop(); LIB.open = null; LIB.node = null; LIB.role = ''; LIB.ori = '';
         for (const aid of aids){ if (v === 1 && refd.has(aid)) continue; const it = auItem(aid); if (!it) continue;
           Object.keys(AU_REFS).forEach(sl => { const M = A[AU_REFS[sl]]; if (isObj(M)) Object.keys(M).forEach(p => { if (M[p] === aid) delete M[p]; }); });
@@ -9875,7 +9887,7 @@ async function memoStore(sid, blob, dur){
   memoRefreshAround(sid);
 }
 async function memoDelete(aid){
-  const it = auItem(aid); const v = await askDialog('Supprimer ce mémo ?', 'Mémo de ' + memoHour(it ? it.at : Date.now()) + ' · ' + auTime(it ? it.d : 0) + '. Il sera effacé de cet appareil' + (it && it.asset ? ' et de la synchro' : '') + '.', [{ label:'Supprimer', value:1, primary:true }, { label:'Annuler', value:0 }]);
+  const it = auItem(aid); const v = await askDialog('Supprimer ce mémo ?', 'Mémo de ' + memoHour(it ? it.at : Date.now()) + ' · ' + auTime(it ? it.d : 0) + '. Il sera effacé de cet appareil' + (it && it.asset ? ' et de la synchro' : '') + '.', [{ label:'Supprimer', value:1, primary:true, danger:true }, { label:'Annuler', value:0 }]);
   if (!v) return; if (MEMO.cur && MEMO.cur.aid === aid) memoStopPlay(); const A = auMeta(); let sid = null;
   Object.keys(A.memos || {}).forEach(k => { if (Array.isArray(A.memos[k]) && A.memos[k].indexOf(aid) >= 0){ sid = k; A.memos[k] = A.memos[k].filter(x => x !== aid); if (!A.memos[k].length) delete A.memos[k]; } });
   await auForget(aid); saveMeta(); if (sid) memoRefreshAround(sid);
