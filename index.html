@@ -3468,13 +3468,14 @@ function timerSid(){ let t = null; try{ t = T; }catch(e){} if (!t || t.finished 
   const s = BY_ID[t.id]; return s && !s.reserve && s.week && !(progress[s.id] && progress[s.id].done) ? s.id : ''; }
 function nextSessionRaw(){
   { const ts = timerSid(); if (ts) return BY_ID[ts]; }
-  const t = todayISO(); const open = ALL.filter(s => !s.reserve && !sessBefore(s) && !(progress[s.id] && progress[s.id].done) && s.timer).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.idx - b.idx);
+  const t = todayISO(), placee = s => s.date >= t && (s.moved || s.idx === rIdx()); /* étape 162 : une session que tu as placée toi-même sur aujourd'hui ou plus tard (une Bass ratée, déplacée depuis les anciennes sessions, seule ou avec toute la suite) compte, même si elle vient avant ta dernière session faite */
+  const open = ALL.filter(s => !s.reserve && (!sessBefore(s) || placee(s)) && !(progress[s.id] && progress[s.id].done) && s.timer).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.idx - b.idx);
   /* étape 74 : la suite de ce que tu as vraiment fait (après la dernière session faite, dans l'ordre du programme) ; sinon comme avant */
   const lastDone = ALL.reduce((m, s) => !s.extra && !s.reserve && s.timer && progress[s.id] && progress[s.id].done ? Math.max(m, s.idx) : m, -1);
-  const after = open.filter(s => !s.extra && s.idx > lastDone);
+  const after = open.filter(s => !s.extra && (s.idx > lastDone || placee(s)));
   const c = after.length ? (after.find(s => s.date >= t) || after[0]) : (open.find(s => s.date >= t) || open[0]);
   const px = open.find(s => s.extra && (s.prolong || s.date === t)); /* étape 125 : une session rapide créée pour aujourd'hui passe aussi en premier ; étape 116 : une session ajoutée « en plus » (prolonger un élément) vient avant celle qu'elle repousse */
-  return px && (!c || px.date <= c.date) ? px : c;
+  return px && (!c || px.date < c.date) ? px : c; /* étape 162 : le même jour, l'ordre de la liste : la session prévue (ou déplacée là) d'abord, la session « + 1 » ou rapide ensuite */
 }
 /* étape 116 : prolonger l'élément de ta dernière session (« pas fini à temps ») : une session de plus de cet élément, juste avant la prochaine ;
  la suite du planning recule d'une session (sauf si tu es en avance : elle prend alors ton prochain jour libre) */
