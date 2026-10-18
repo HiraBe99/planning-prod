@@ -2441,7 +2441,7 @@ function appTitle(){ const P = meta.project; return P ? ((P.name || '').trim() |
 function capSegs(t){ return String(t || '').split(/(\s*·\s*)/).map(x => /·/.test(x) ? x : x.charAt(0).toUpperCase() + x.slice(1)).join(''); }
 function brandTitle(){ const P = meta.project; return capTxt(P ? ((P.name || '').trim() || 'Mon projet') : ((meta.brand && meta.brand.name) || 'Planning prod'), 60); }
 /* « 60h/morceau · 7h/sem. » dans le sous-titre : les chiffres suivent toujours la structure réelle (plus de sous-titre qui contredit les compteurs) */
-function liveSub(t){ try{ const TN = totalsNow(), k = BLOCKS.find(b => b !== 'Tampon'), ph = k && TN.perBlock[k] ? rh(TN.perBlock[k]) : null;
+function liveSub(t){ try{ const TN = totalsNow(true), /* le sous-titre décrit le modèle (sans les sessions ajoutées) */ k = BLOCKS.find(b => b !== 'Tampon'), ph = k && TN.perBlock[k] ? rh(TN.perBlock[k]) : null;
   return String(t).replace(/\d+(?:[.,]\d+)?\s?h\/sem\./g, rh(weekHours()) + 'h/sem.').replace(/\d+(?:[.,]\d+)?\s?h\/(morceau|beat|ep|titre|track)\b/gi, (m, u) => ph != null ? ph + 'h/' + u : m); }catch(e){ return t; } }
 function brandSub(){ const P = meta.project; if (!P && meta.brand && meta.brand.sub) return capTxt(liveSub(meta.brand.sub), 80); if (!P) return liveSub('D&B / Neurofunk · 60h/morceau · ' + rh(weekHours()) + 'h/sem.'); if ((P.subtitle || '').trim()) return capTxt(liveSub(capSegs(P.subtitle.trim())), 80); return rh(weekHours()) + 'h/sem. · ' + P.tracks + ' ' + unitPlural(UNIT).toLowerCase() + ' · ' + D.weeks.length + ' sem.'; }
 /* édition sur place harmonisée (sessions et en-tête) : comme Notion ou Trello, le curseur se place là où on a cliqué, sans tout sélectionner */
@@ -3235,10 +3235,13 @@ function renderThemePop(){
 applyTheme();
 
 /* ----- meters ----- */
-function totalsNow(){ const perBlock = {}; let totalHours = 0; ALL.forEach(s => { if (s.extra || s.reserve) return; perBlock[s.piste] = (perBlock[s.piste] || 0) + s.duree; totalHours += s.duree; }); return { perBlock, totalHours }; }
+/* étape 163 : les sessions « + 1 » et « en plus » font partie du planning (elles reculent la fin du morceau) : comptées dans le total comme dans le fait ;
+ une session rapide (ponctuelle, hors planning) ne compte ni dans l'un ni dans l'autre. Avant : le total les ignorait toutes, le fait les comptait toutes (barre > 100 % possible). */
+const horsPlanning = s => s.reserve || (s.extra && !s.prolong);
+function totalsNow(modele){ const perBlock = {}; let totalHours = 0; ALL.forEach(s => { if (modele ? (s.extra || s.reserve) : horsPlanning(s)) return; perBlock[s.piste] = (perBlock[s.piste] || 0) + s.duree; totalHours += s.duree; }); return { perBlock, totalHours }; }
 function renderMeters(){
   const TN = totalsNow(); let done = 0; const per = {};
-  ALL.forEach(s => { if (progress[s.id] && progress[s.id].done){ done += s.duree; per[s.piste] = (per[s.piste] || 0) + s.duree; } });
+  ALL.forEach(s => { if (!horsPlanning(s) && progress[s.id] && progress[s.id].done){ done += s.duree; per[s.piste] = (per[s.piste] || 0) + s.duree; } });
   document.getElementById('meter-total').style.width = Math.min(100, done / TN.totalHours * 100) + '%';
   document.getElementById('meter-total-value').textContent = rh(done) + 'h / ' + Math.round(TN.totalHours) + 'h';
   /* le joker (rattrapage) n'est pas un morceau : il compte dans l'année, mais n'a pas sa barre ; chaque morceau a une largeur à la mesure de ses heures */
@@ -3274,9 +3277,10 @@ function slotFmt(n){ const N = nDays(); return slotFmtAt(((n % N) + N) % N); }
 function regularDate(s, slots){ return slotDate((s.slot != null ? s.slot : s.idx) + slotOff() + (slots || 0)); }
 function shiftSlots(list, idx){ let n = 0, f = -1; (list || []).forEach(e => { if (e.from <= idx && e.from >= f){ n = nDays() * (e.w || 0) + (e.s || 0); f = e.from; } }); return n; }
 function extrasList(){ return Array.isArray(meta.extras) ? meta.extras : []; }
-function weekOf(dateISO){
-  let best = D.weeks[0];
-  for (const w of D.weeks){ if (dateISO >= w.dateStart && dateISO <= w.dateEnd) return w; if (w.dateStart <= dateISO) best = w; }
+function weekOf(dateISO){ /* la semaine qui contient ce jour ; sinon la plus proche (étape 163 : avant, toujours la semaine d'avant → une session « + 1 » du mardi 6 rangée dans « 28 sept. – 3 oct. ») */
+  const jours = iso => Math.round(parseISO(iso).getTime() / 864e5); let best = D.weeks[0], bd = Infinity;
+  for (const w of D.weeks){ if (!w.dateStart || !w.dateEnd) continue; if (dateISO >= w.dateStart && dateISO <= w.dateEnd) return w;
+    const d = dateISO < w.dateStart ? jours(w.dateStart) - jours(dateISO) : jours(dateISO) - jours(w.dateEnd); if (d < bd){ bd = d; best = w; } }
   return best;
 }
 function buildExtras(){
@@ -3291,6 +3295,9 @@ function buildExtras(){
       week:w.week, piste:w.piste, pos:0, idx:100000 + k };
     ALL.push(s); BY_ID[s.id] = s;
     w.ordered = (w.ordered || w.sessions.slice()).concat([s]).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.idx - b.idx);
+    if (s.date && w.dateStart && w.dateEnd && (s.date < w.dateStart || s.date > w.dateEnd)){ /* étape 163 : les dates de la semaine couvrent aussi ses sessions « + 1 » et rapides */
+      if (s.date < w.dateStart) w.dateStart = s.date; if (s.date > w.dateEnd) w.dateEnd = s.date;
+      w.dateLabel = w.dateStart === w.dateEnd ? shortD(parseISO(w.dateStart)) : shortD(parseISO(w.dateStart)) + ' – ' + shortD(parseISO(w.dateEnd)); }
   });
 }
 /* étape 107 : jour de la dernière minute travaillée dans le minuteur (pour une session faite avant que l'outil note le jour : « Fait le … » sur la ligne réduite) */
@@ -3401,7 +3408,10 @@ function resumeFrom(id, dateISO, markPrev, pin, force){
   if (row){ row.classList.add('flash'); setTimeout(() => row.classList.remove('flash'), 2200); }
   const top = document.getElementById('next-card'); if (top && top.scrollIntoView) top.scrollIntoView({ behavior:'smooth', block:'start' });
 }
+function moveExtra(id, dateISO){ const s0 = BY_ID[id], L = extrasList(), e = L.find(x => x && x.id === id); if (!e) return; /* étape 163 */
+  if (e.date === dateISO) return; planLog('Date changée : ' + s0.bloc + ' du ' + dayShort(e.date) + ' au ' + dayShort(dateISO)); e.date = dateISO; meta.extras = L.slice(); saveMeta(true); firstRender = true; renderAll(); }
 function moveOne(id, dateISO){
+  if (BY_ID[id] && BY_ID[id].extra){ moveExtra(id, dateISO); return; }
   const s0 = BY_ID[id]; planLog('Date changée : ' + s0.bloc + ' du ' + dayShort(s0.date) + ' au ' + dayShort(dateISO) + ' (cette session seulement)'); meta.overrides = Object.assign({}, meta.overrides || {}); if (dateISO === s0.planned) delete meta.overrides[id]; else meta.overrides[id] = dateISO; saveMeta(true); renderAll();
 }
 function resetOne(id){ { const x = BY_ID[id]; if (x) planLog('Date prévue rétablie : ' + x.bloc + ' (' + dayShort(x.planned || x.date) + ')'); } meta.overrides = Object.assign({}, meta.overrides || {}); delete meta.overrides[id]; saveMeta(true); renderAll(); }
@@ -3430,6 +3440,9 @@ function editHtml(s, plan){
     QUICK_DAYS +
     '<div class="edit-row"><button class="btn btn-primary" type="button" data-buf-plan="' + s.id + '">Appliquer</button><button class="btn" type="button" data-buf-unplan="' + s.id + '">Remettre en réserve</button></div>' +
     '<p class="help">' + (s.inFlow ? 'Prévue d’office entre deux morceaux. La remettre en réserve rapproche le morceau suivant d’une session.' : 'Les sessions joker ne décalent pas le reste du planning.') + '</p></div>';
+  if (s.extra) return '<div class="edit"><label class="f">Nouvelle date<input type="date" data-ed-date value="' + tomorrow + '"></label>' + QUICK_DAYS + /* étape 163 : une session rapide ou « + 1 » se déplace seule (avant : le panneau des sessions prévues, sans effet, et « toute la suite » plantait) */
+    '<div class="edit-warn" data-ed-warn="' + s.duree + '"' + (dayIssue(tomorrow, s.duree) ? '' : ' hidden') + '>' + warnHtml(tomorrow, s.duree) + '</div>' +
+    '<div class="edit-row"><button class="btn btn-primary" type="button" data-ed-apply="' + s.id + '">Appliquer</button></div><p class="help">Les autres sessions ne bougent pas.</p></div>';
   return '<div class="edit">' +
     '<label class="f">Nouvelle date<input type="date" data-ed-date value="' + tomorrow + '"></label>' +
     QUICK_DAYS +
@@ -3454,12 +3467,16 @@ function syncFocus(){
 let filter = 'Tout', lite = false, allOpen = false, showPast = false;
 const rIdx = () => (typeof meta.resumeIdx === 'number' ? meta.resumeIdx : -1);
 const isPast = w => w.dateEnd < todayISO();
+/* étape 163 : une session que tu as placée toi-même sur aujourd'hui ou plus tard (déplacée seule ou avec toute la suite) : elle compte comme session à faire, même si elle vient avant ta dernière session faite ou avant un recalage */
+const placee = s => !s.extra && !s.reserve && !!s.date && s.date >= todayISO() && (s.moved || s.idx === rIdx());
+/* une semaine passée garde une session vivante (déplacée à aujourd'hui, ou session « + 1 » posée là) : elle n'est pas « ancienne » */
+const weekAlive = w => (w.ordered || w.sessions).some(s => !s.reserve && !(progress[s.id] && progress[s.id].done) && (s.extra ? s.date >= todayISO() : placee(s)));
 const sessBefore = s => !s.extra && s.idx < rIdx();
-const weekGone = w => isPast(w) || w.sessions.every(sessBefore);
+const weekGone = w => !weekAlive(w) && (isPast(w) || w.sessions.every(sessBefore));
 
 let NS_GEN = 0, NS_MEMO = null;
 function nextSession(){
-  const key = NS_GEN + '|' + SAVE_REV + '|' + ALL.length + '|' + todayISO() + '|' + rIdx() + '|' + timerSid(); if (NS_MEMO && NS_MEMO.key === key) return NS_MEMO.v;
+  const key = NS_GEN + '|' + SAVE_REV + '|' + ALL.length + '|' + todayISO() + '|' + rIdx() + '|' + timerSid() + '|' + (lite ? 'E' : ''); if (NS_MEMO && NS_MEMO.key === key) return NS_MEMO.v;
   const v = nextSessionRaw(); NS_MEMO = { key, v }; return v; }
 /* étape 81 : la session lancée dans le minuteur (même en pause) est TA session du moment : carte du haut, semaine ouverte,
  « Tout replier » et barres des formats la suivent (avant : la carte et « Tout replier » visaient la suite de la dernière session faite,
@@ -3468,14 +3485,17 @@ function timerSid(){ let t = null; try{ t = T; }catch(e){} if (!t || t.finished 
   const s = BY_ID[t.id]; return s && !s.reserve && s.week && !(progress[s.id] && progress[s.id].done) ? s.id : ''; }
 function nextSessionRaw(){
   { const ts = timerSid(); if (ts) return BY_ID[ts]; }
-  const t = todayISO(), placee = s => s.date >= t && (s.moved || s.idx === rIdx()); /* étape 162 : une session que tu as placée toi-même sur aujourd'hui ou plus tard (une Bass ratée, déplacée depuis les anciennes sessions, seule ou avec toute la suite) compte, même si elle vient avant ta dernière session faite */
-  const open = ALL.filter(s => !s.reserve && (!sessBefore(s) || placee(s)) && !(progress[s.id] && progress[s.id].done) && s.timer).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.idx - b.idx);
+  const t = todayISO(); /* étape 162 : une session placée à la main (placee) compte, même si elle vient avant ta dernière session faite */
+  let open = ALL.filter(s => !s.reserve && (!sessBefore(s) || placee(s)) && !(progress[s.id] && progress[s.id].done) && s.timer).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.idx - b.idx);
+  if (lite){ const e = open.filter(s => s.essentiel); if (e.length) open = e; } /* étape 163 : avec « Essentiel », la carte propose une session essentielle (la liste cache les autres) */
   /* étape 74 : la suite de ce que tu as vraiment fait (après la dernière session faite, dans l'ordre du programme) ; sinon comme avant */
   const lastDone = ALL.reduce((m, s) => !s.extra && !s.reserve && s.timer && progress[s.id] && progress[s.id].done ? Math.max(m, s.idx) : m, -1);
   const after = open.filter(s => !s.extra && (s.idx > lastDone || placee(s)));
   const c = after.length ? (after.find(s => s.date >= t) || after[0]) : (open.find(s => s.date >= t) || open[0]);
-  const px = open.find(s => s.extra && (s.prolong || s.date === t)); /* étape 125 : une session rapide créée pour aujourd'hui passe aussi en premier ; étape 116 : une session ajoutée « en plus » (prolonger un élément) vient avant celle qu'elle repousse */
-  return px && (!c || px.date < c.date) ? px : c; /* étape 162 : le même jour, l'ordre de la liste : la session prévue (ou déplacée là) d'abord, la session « + 1 » ou rapide ensuite */
+  const px = open.find(s => s.extra && s.date >= t && (s.prolong || s.date === t)); /* étape 163 : une session « + 1 » dont le jour est passé est en retard comme les autres (avant : elle restait sur la carte, « Prochaine session · mardi 6 oct. ») */ /* étape 125 : une session rapide créée pour aujourd'hui passe aussi en premier ; étape 116 : une session ajoutée « en plus » (prolonger un élément) vient avant celle qu'elle repousse */
+  if (!px || !c) return px || c;
+  if (px.date !== c.date) return px.date < c.date ? px : c;
+  return (px.week - c.week || px.idx - c.idx) < 0 ? px : c; /* étapes 162-163 : le même jour, l'ordre de la liste (semaine, puis place dans la semaine) : la carte montre la première ligne « Aujourd'hui » */
 }
 /* étape 116 : prolonger l'élément de ta dernière session (« pas fini à temps ») : une session de plus de cet élément, juste avant la prochaine ;
  la suite du planning recule d'une session (sauf si tu es en avance : elle prend alors ton prochain jour libre) */
@@ -3544,7 +3564,7 @@ function aheadDay(s){
  et toute la suite garde le rythme prévu ; les sessions faites ne bougent pas. Proposé quand la prochaine session n'est pas déjà à ce jour-là. */
 /* la session où tu en es : la première pas faite après ta dernière session faite (dans l'ordre du programme), même si elle est en retard */
 function recaleInfo(){ const lastDone = ALL.reduce((m, x) => !x.extra && !x.reserve && x.timer && progress[x.id] && progress[x.id].done ? Math.max(m, x.idx) : m, -1);
-  const t = ALL.find(x => !x.extra && !x.reserve && !x.buffer && !x.free && x.timer && x.idx > lastDone && !(progress[x.id] && progress[x.id].done)); if (!t || t.id === timerSid()) return null;
+  const t = ALL.find(x => !x.extra && !x.reserve && !x.buffer && !x.free && x.timer && x.idx > lastDone && !(progress[x.id] && progress[x.id].done)); if (!t || t.id === timerSid() || t.moved || (meta.overrides || {})[t.id]) return null; /* étape 163 : une date posée à la main (déplacement, reprise après pause) n'est pas « à recaler » (étape 143 : elle n'est jamais ramenée à aujourd'hui) */
   const d = freeDay(t, '', t.date < todayISO()); return d && d !== t.date ? { id: t.id, d } : null; } /* étape 153 : en retard, on repart dès le prochain jour de travail (avant : seulement un jour assez long pour cette session → une session de week-end laissait la semaine vide) */
 function dayShort(iso){ const d = parseISO(iso); return WD[d.getDay()].slice(0, 3).toLowerCase() + '. ' + shortD(d); } /* « ven. 9 oct. » */
 function trackEndISO(p){ let e = ''; ALL.forEach(s => { if (s.reserve || s.buffer || !s.date || (p !== 'Tout' && s.piste !== p) || s.piste === 'Tampon') return; if (s.date > e) e = s.date; }); return e; }
@@ -3576,8 +3596,8 @@ function renderNext(){
         '<div class="goal-txt">' + nb + ' session' + (nb > 1 ? 's' : '') + ' · ' + fmtDur(Math.round(m)) + '</div>' +
         '<div class="btn-row"><button class="btn btn-primary" type="button" data-done-extra>' + I.play + ' Session rapide</button><button class="btn" type="button" data-done-project>Configurer le projet</button></div></div>'; return; }
     el.innerHTML = ''; return; }
-  const ad = aheadDay(s), isToday = (ad || s.date) === todayISO(), pi = s.id === timerSid() ? null : prolongInfo(s), rc = s.extra ? null : recaleInfo(); /* étape 125 : rien à ajouter pendant une session en cours */
-  el.innerHTML = '<div class="card next"><div class="next-top"><span class="piste-tag' + (s.piste === 'Tampon' ? ' piste-tag--buffer' : '') + '">' + tnameHtml(s.piste) + '\u00a0· S' + s.week + '</span>' + keyChip(s.piste, true) + intentChip(s.piste) + (s.essentiel ? '<span class="s-ess">Essentiel</span>' : '') + '<span class="next-when">' + (s.id === timerSid() ? 'En cours' : isToday ? "Aujourd’hui" : 'Prochaine session') + ' · ' + esc(ad ? aheadLabel(ad, true) : s.jour + ' ' + s.dateLabel) + '</span></div>' +
+  const ad = aheadDay(s), isToday = (ad || s.date) === todayISO(), enRetard = !isToday && (ad || s.date) < todayISO(), pi = s.id === timerSid() ? null : prolongInfo(s), rc = s.extra || placee(s) ? null : recaleInfo(); /* étape 163 : « En retard » quand la date est passée (comme la ligne) */ /* étape 125 : rien à ajouter pendant une session en cours ; étape 163 : ni « Recaler » sur une session que tu as placée toi-même (le bouton viserait une autre session) */
+  el.innerHTML = '<div class="card next"><div class="next-top"><span class="piste-tag' + (s.piste === 'Tampon' ? ' piste-tag--buffer' : '') + '">' + tnameHtml(s.piste) + '\u00a0· S' + s.week + '</span>' + keyChip(s.piste, true) + intentChip(s.piste) + (s.essentiel ? '<span class="s-ess">Essentiel</span>' : '') + '<span class="next-when">' + (s.id === timerSid() ? 'En cours' : isToday ? "Aujourd’hui" : enRetard ? 'En retard' : 'Prochaine session') + ' · ' + esc(ad ? aheadLabel(ad, true) : s.jour + ' ' + s.dateLabel) + '</span></div>' +
     '<h3><span class="s-name" data-bid="' + s.id + '" tabindex="0" title="Cliquer pour renommer">' + esc(s.bloc) + '</span> · ' + (s.extra ? fmtDur(s.minutes) : '<button type="button" class="dur-btn" data-fmtpick="' + s.id + '" aria-haspopup="menu" aria-expanded="false" title="Changer la durée de cette session">' + fmtDur(s.minutes) + I.chevDown + '</button>') + '</h3>' + (() => { const x = trackIntent(s.piste); return x ? '<div class="next-intent" data-intent="' + esc(pNum(s.piste)) + '" role="button" tabindex="0" title="Fil rouge du morceau · clique pour le modifier"><b>Fil rouge</b> ' + esc(intentText(x)) + '</div>' : ''; })() + '<div class="next-lbl">But de la session</div>' + nextGoalHtml(s) + nextCritsHtml(s) + (myGoal(s) ? '' : ideaHtml(s, 'next-idea')) + prevHtml(s, 'next-test next-prev') +
     '<div class="btn-row"><button class="btn btn-primary" data-start="' + s.id + '" type="button">' + I.play + ' ' + (T && !T.finished && T.id === s.id && T.started ? 'Reprendre la session' : 'Démarrer la session') + '</button>' + (pi ? '<button type="button" class="text-btn next-prolong" data-prolong="' + s.id + '" title="' + esc('Pas fini ? Une session « ' + pi.fam + ' » de plus, ' + (plusDay(s).hole ? 'le ' + dayShort(plusDay(s).hole) + ' (jour libre) : rien ne recule.' : 'avant celle-ci. La suite du planning recule d’une session.')) + '">+ 1 session ' + esc(pi.fam) + '</button>' : '') +
       (rc ? '<button type="button" class="text-btn next-prolong" data-recale="' + rc.id + '" title="' + esc('La suite du planning repart de ' + aheadLabel(rc.d, true).toLowerCase() + ', au rythme prévu. Les sessions faites ne bougent pas.') + '">Recaler le planning</button>' : '') + '</div></div>';
@@ -3651,7 +3671,7 @@ function sessionHtml(s){
       const tip = [s.doneMoved ? 'Prévue le ' + shortD(parseISO(s.planned)) : '', mins ? fmtDur(mins) + ' de travail dans le minuteur' : '', crTxt(s.id), s.doneEst ? 'Jour non noté : ce jour-là au plus tard' : !s.doneReal && !s.extra && s.date > todayISO() ? 'Faite avant que l’outil note le jour où tu travailles : elle garde sa date prévue' : ''].filter(Boolean).join(' · ');
       /* étape 109 : même forme sur toutes les lignes : « Fait · temps » ; le jour est toujours dans la colonne « date » */
       return '<span class="rel rel-done"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>Fait' + (mins ? ' · ' + fmtDur(mins) : '') + '</span>'; })() : rel === 'late' ? '<span class="rel rel-late">En retard</span>' : rel === 'today' ? '<span class="rel rel-today">Aujourd’hui</span>' : dd === tm ? '<span class="rel rel-soon">Demain</span>' : '');
-  return '<div class="session-row' + (e.done ? ' is-done' : '') + ' is-' + rel + ((e.done || dd < td) ? ' is-pastdate' : dd > td ? ' is-upcoming' : '') + '" data-id="' + s.id + '"' + (lite && !s.essentiel ? ' hidden' : '') + '>' +
+  return '<div class="session-row' + (e.done ? ' is-done' : '') + ' is-' + rel + ((e.done || dd < td) ? ' is-pastdate' : dd > td ? ' is-upcoming' : '') + '" data-id="' + s.id + '" data-date="' + (sd ? sd.iso : dd) + '"' + (lite && !s.essentiel ? ' hidden' : '') + '>' + /* étape 163 : la date affichée, lisible par les tests de cohérence */
     '<div class="session-meta"><label class="check" title="Marquer la session comme faite"><input type="checkbox" data-check="' + s.id + '"' + (e.done ? ' checked' : '') + ' aria-label="Session faite"><span class="check-box"></span></label>' +
     '<span class="s-info"><button type="button" class="s-jour' + (e.done && ((!s.doneReal && !s.doneGuess && !s.extra && s.date > td) || s.doneEst) ? ' s-jour--guess' : '') + '" data-edit="' + s.id + '" title="' + esc((s.doneEst ? 'Jour non noté : faite ce jour-là au plus tard · clique pour noter le bon jour' : sd ? 'Jour de ton dernier travail dans le minuteur · Prévue le ' + shortD(parseISO(s.planned)) : e.done && !s.doneReal && !s.doneGuess && !s.extra && s.date > td ? 'Jour non noté (date prévue) · clique pour noter le jour où tu l’as faite' : ad ? 'Ton prochain jour de travail (tu es en avance) · Prévue le ' + shortD(parseISO(s.date)) : canDoneOn(s) ? 'Jour où tu l’as faite' : 'Changer la date')) + '">' + (sd ? esc(sd.text) : ad ? esc(aheadLabel(ad)) : s.jourAbbr + ' ' + esc(s.dateLabel)) + '</button><span class="s-bloc"><span class="tag-t">' + esc(s.bloc) + '</span></span><span class="s-duree">' + fmtDur(s.minutes) + '</span>' + relTag +
     (s.essentiel ? '<span class="s-ess">Essentiel</span>' : '') + (mins ? (e.done ? ''
@@ -3671,12 +3691,12 @@ function sessionHtml(s){
     '<div class="twrap" hidden></div><div class="ewrap" hidden></div><div class="jwrap" hidden></div></div></div>';
 }
 function weekHtml(w, open){
-  const cur = w.week === focusWeek(); if (open === undefined) open = cur; const vis = w.sessions.filter(s => !lite || s.essentiel);
+  const cur = w.week === focusWeek(); if (open === undefined) open = cur; const vis = (w.ordered || w.sessions).filter(s => !lite || s.essentiel); /* étape 163 : les sessions « + 1 » et rapides de la semaine comptent dans « 6/7 » (avant : 6/6 et semaine marquée finie avec une session rapide à faire) */
   const done = vis.filter(s => progress[s.id] && progress[s.id].done).length;
   const closed = !cur && vis.length > 0 && done === vis.length;
   return '<details class="week-card' + (cur ? ' is-current' : '') + (closed ? ' is-closed' : '') + '" data-week="' + w.week + '" data-piste="' + w.piste + '"' + (cur ? ' open' : '') + '>' +
     '<summary><span class="week-num">S' + w.week + '</span><span class="week-date">' + esc(w.dateLabel) + '</span><span class="wk-tags"><span class="wk-slot wk-s-tag"><span class="piste-tag' + (w.piste === 'Tampon' ? ' piste-tag--buffer' : ' tname') + '"' + (w.piste === 'Tampon' ? '' : ' data-tname-inline="' + esc(pNum(w.piste)) + '" tabindex="0" title="Renommer ce ' + esc(UNIT.toLowerCase()) + ' (clic)"') + '><span class="tag-t">' + esc(pName(w.piste)) + '</span></span></span><span class="wk-slot wk-s-key">' + keyChip(w.piste, false) + '</span>' +
-    (cur ? '<span class="badge-now">' + (todayISO() < w.dateStart && !w.sessions.some(x => x.date && x.date <= todayISO() && !(progress[x.id] && progress[x.id].done)) ? 'À venir' : 'Cette semaine') + '</span>' : '') /* étape 156 : une session de la semaine déplacée à aujourd'hui : « Cette semaine », pas « À venir » */ + '</span>' +
+    (cur ? '<span class="badge-now">' + (todayISO() < w.dateStart && !(w.ordered || w.sessions).some(x => x.date && x.date <= todayISO() && !(progress[x.id] && progress[x.id].done)) ? 'À venir' : 'Cette semaine') + '</span>' : '') /* étape 156 : une session de la semaine déplacée à aujourd'hui : « Cette semaine », pas « À venir » */ + '</span>' +
     '<span class="week-progress"><span class="week-progress-fill" style="width:' + (done / vis.length * 100) + '%"></span></span><span class="week-count">' + done + '/' + vis.length + '</span>' + I.chev + '</summary>' +
     '<div class="view-switch" data-vw="' + w.week + '" hidden><div class="seg-ctl" role="group" aria-label="Affichage de la semaine">' +
       '<button type="button" data-vmode="jour" data-vweek="' + w.week + '">Session du jour</button><button type="button" data-vmode="semaine" data-vweek="' + w.week + '">Semaine</button></div><button type="button" class="chip vs-ess" data-lite aria-pressed="false" title="N’afficher que les sessions essentielles">Essentiel</button></div>' +
@@ -3754,7 +3774,9 @@ function applyFilterRaw(){
     c.classList.toggle('mode-jour', mode === 'jour');
   });
   const visible = [...document.querySelectorAll('.week-card')].filter(c => c.style.display !== 'none');
-  const fw = focusWeek(), fi = visible.findIndex(c => +c.dataset.week === fw); const extra = visible.slice(fi >= 0 ? fi + 1 : 1).filter(c => +c.dataset.week !== fw && +c.dataset.week !== pinWeek);
+  const fw = focusWeek(), fi = visible.findIndex(c => +c.dataset.week === fw), cw = currentWeek(), td = todayISO();
+  const duJour = c => (D.weeks[+c.dataset.week - 1].ordered || D.weeks[+c.dataset.week - 1].sessions).some(x => x.date === td && !x.reserve && !(progress[x.id] && progress[x.id].done)); /* étape 163 : une semaine avec une session d'aujourd'hui, et la semaine du calendrier, restent visibles quand la carte vise une semaine plus ancienne */
+  const extra = visible.slice(fi >= 0 ? fi + 1 : 1).filter(c => +c.dataset.week !== fw && +c.dataset.week !== pinWeek && !duJour(c) && !(fi >= 0 && fw < cw && +c.dataset.week === cw));
   if (!showAllWeeks) extra.forEach(c => { c.style.display = 'none'; });
   const mb = document.getElementById('more-weeks');
   mb.hidden = extra.length === 0;
@@ -4755,7 +4777,9 @@ function startTimer(id, freeKey, startIdx){
   if (same){ if (startIdx != null) jumpTo(startIdx); openTimer(); return; }
   if (T && !T.finished){
     askDialog('Une autre session est en cours', 'Veux-tu la remplacer par celle-ci ?', [ { label: 'Remplacer', value: true, primary: true }, { label: 'Revenir à la session en cours', value: false } ])
-      .then(ok => { if (ok){ T = null; clearInterval(tick); startTimer(id, freeKey, startIdx); if (jamMins(freeKey) && T && !T.started) resume(); } else openTimer(); });
+      .then(ok => { if (ok){ /* étape 163 : comme « Arrêter » en gardant les minutes : le temps déjà travaillé sur l'autre session est noté, le minuteur rangé proprement (avant : minutes perdues, carte restée sur « En cours », ancien minuteur encore en mémoire) */
+          const old = T; const mins = old && !old.finished && old.id ? Math.round((old.active || 0) / 60000) : 0; if (mins > 0 && BY_ID[old.id]){ addMinutes(old.id, mins); saveProgress(); try{ refreshWeek(BY_ID[old.id].week); renderSuivi(); }catch(e){} }
+          clearInterval(tick); keepAwake(false); T = null; persistTimer(); startTimer(id, freeKey, startIdx); if (jamMins(freeKey) && T && !T.started) resume(); try{ renderNext(); renderSplits(); }catch(e){} } else openTimer(); });
     return;
   }
   setTimeout(ensureAudio, 80);
@@ -5897,7 +5921,7 @@ document.addEventListener('click', ev => { if (Date.now() - FH_SUPPRESS < 350 &&
 function renderSplitsHtml(){
   const F = fmts();
   return F.map((f, fi) => { const st = normSteps(f.steps), ns = nextOfFmt(f.id), gi = growIndex(st), id = esc(f.id);
-    return '<div><div class="split-head"><span class="lbl">' + esc(fmtLabel(f)) + (ns ? ' <span class="split-target">→ ' + esc(ns.bloc) + ' · ' + esc(ns.jourAbbr.toLowerCase()) + '. ' + esc(ns.dateLabel) + '</span>' : '') + '</span>' +
+    return '<div><div class="split-head"><span class="lbl">' + esc(fmtLabel(f)) + (ns ? ' <span class="split-target">→ ' + esc(ns.bloc) + ' · ' + esc(dayShort(aheadDay(ns) || ns.date)) + '</span>' : '') /* étape 163 : même jour que la carte et la ligne (« en avance » compris) */ + '</span>' +
       '<span class="sh-right">' +
       (fi === 0 ? '<button type="button" class="icon-btn fmt-more" id="fmt-edit" aria-label="Paramétrer les formats de session" title="Paramétrer les formats de session : étapes, durées, format de chaque jour"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><circle cx="4.5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15.5" cy="10" r="1.6"/></svg></button>' : '<span class="fmt-gap"></span>') + '</span></div>' +
       '<div class="split big">' + st.map((x, i) => '<button type="button" class="' + (x.prod ? 'prod' : '') + '" style="--g:' + x.min + '" data-role="' + x.role + '"' + (i === gi ? ' data-grow="1"' : '') + ' data-free="' + id + '" data-fstep="' + i + '" data-tip="' + esc(x.name) + ' · ' + x.min + ' min" aria-label="Lancer ' + esc(x.name) + ', ' + x.min + ' minutes"><span class="m">' + x.min + '′</span><span class="n">' + esc(x.short) + '</span></button>' + (i < st.length - 1 ? '<span class="split-h" data-fh="' + fi + ':' + i + '" data-tip="Glisser pour répartir les minutes entre ' + esc(x.short) + ' et ' + esc(st[i + 1].short) + '"></span>' : '')).join('') + '</div>' +
@@ -5949,11 +5973,11 @@ function init(){
     if (!ev.target.closest('#pause-resume')) return; const d = document.getElementById('pause-date').value; if (!d){ toast('Choisis une date'); return; }
     const first = ALL.filter(s => !s.reserve && s.timer && !sessBefore(s) && !(progress[s.id] && progress[s.id].done)).sort((a, b) => a.idx - b.idx)[0];
     delete meta.pause; planLog('Reprise du projet le ' + dayShort(d));
-    if (first) resumeFrom(first.id, firstSlotFrom(d, first.duree), false); else { saveMeta(true); renderAll(); }
+    if (first) resumeFrom(first.id, firstSlotFrom(d, first.duree), false, true, true); else { saveMeta(true); renderAll(); } /* étape 163 : date de reprise posée à la main (gardée) : la carte ne ramenait la session à aujourd'hui « en avance » juste après la reprise */
   });
   document.getElementById('more-weeks').onclick = () => { showAllWeeks = !showAllWeeks; pinWeek = 0; applyFilter(); if (!showAllWeeks){ const c = [...document.querySelectorAll('.week-card')].filter(x => x.style.display !== 'none').pop(); if (c && c.scrollIntoView) c.scrollIntoView({ behavior:'smooth', block:'center' }); } };
   /* « Essentiel » vit maintenant à côté de « Session du jour / Semaine », dans chaque semaine (réglage commun à toutes) */
-  document.addEventListener('click', ev => { if (!ev.target.closest('[data-lite]')) return; lite = !lite; setPref('lite', lite); renderWeeks(); });
+  document.addEventListener('click', ev => { if (!ev.target.closest('[data-lite]')) return; lite = !lite; setPref('lite', lite); renderNext(); renderWeeks(); try{ renderSplits(); }catch(e){} }); /* étape 163 : la carte suit (session essentielle) */
   document.getElementById('add-extra').onclick = () => { const p = document.getElementById('extra-form'); if (p.hidden) openExtraForm(); else closeExtraForm(); };
   document.addEventListener('click', ev => { if (!(ev.target.closest && ev.target.closest('#toggle-all'))) return; /* étape 63 : le bouton est redessiné avec la ligne du filtre */
     const expand = !allExpanded(), fw = focusWeek(); showAllWeeks = expand;
@@ -5996,7 +6020,7 @@ function init(){
       if (!v){ toast('Choisis une date'); return; }
       const mode = (box.querySelector('input[type=radio]:checked') || {}).value;
       const issue = dayIssue(v, BY_ID[ea.dataset.edApply].duree);
-      try{ if (mode === 'one') moveOne(ea.dataset.edApply, v); else resumeFrom(ea.dataset.edApply, v, box.querySelector('[data-ed-prev]').checked, true, true); if (issue) setTimeout(() => toast('Date conservée : ' + issue.replace(/\.$/, '')), 150); }
+      try{ if (mode === 'one' || !mode || (BY_ID[ea.dataset.edApply] && BY_ID[ea.dataset.edApply].extra)) moveOne(ea.dataset.edApply, v); else resumeFrom(ea.dataset.edApply, v, box.querySelector('[data-ed-prev]').checked, true, true); if (issue) setTimeout(() => toast('Date conservée : ' + issue.replace(/\.$/, '')), 150); }
       catch(err){ console.error(err); toast('Erreur : ' + (err && err.message ? err.message : err)); }
       return; }
     const ex = ev.target.closest('[data-ed-reset]'); if (ex){ resetOne(ex.dataset.edReset); return; }
@@ -6036,7 +6060,7 @@ function init(){
   });
   document.getElementById('weeks-list').addEventListener('change', ev => {
     const cb = ev.target.closest('[data-check]'); if (!cb) return; const s = BY_ID[cb.dataset.check];
-    const setDone = v => { const w0 = s.week; planLog((v ? 'Faite : ' : 'Décochée : ') + s.bloc + (v ? '' : (progress[s.id] && progress[s.id].doneOn ? ' (elle était faite le ' + dayShort(progress[s.id].doneOn) + ')' : ''))); saveMeta(); markDone(s.id, v); saveProgress(); if (!s.extra) renderAll(); refreshWeek(w0); if (s.week !== w0) refreshWeek(s.week); renderMeters(); renderNext(); renderSplits(); fitLabels(); syncFocus(); };
+    const setDone = v => { const w0 = s.week; planLog((v ? 'Faite : ' : 'Décochée : ') + s.bloc + (v ? '' : (progress[s.id] && progress[s.id].doneOn ? ' (elle était faite le ' + dayShort(progress[s.id].doneOn) + ')' : ''))); saveMeta(); markDone(s.id, v); saveProgress(); renderAll(); refreshWeek(w0); /* étape 163 : aussi pour une session rapide : cochée un autre jour que sa date, elle s'affiche tout de suite au jour réel (avant : seulement après rechargement) */ if (s.week !== w0) refreshWeek(s.week); renderMeters(); renderNext(); renderSplits(); fitLabels(); syncFocus(); };
     setDone(cb.checked);
   });
   document.getElementById('weeks-list').addEventListener('click', ev => {
@@ -6397,9 +6421,9 @@ function renderToday(){
   const el = document.getElementById('todayview'); if (!el) return;
   const s = nextSession(), now = new Date();
   if (!s){ el.innerHTML = '<div class="today-inner"><div class="today-top"><span>' + esc(WD[now.getDay()]) + ' ' + esc(shortD(now)) + '</span></div><div class="today-mid"><div class="today-bloc">Rien de prévu</div><p class="today-obj">Aucune session à venir dans ton planning.</p></div><div class="today-bottom"><button type="button" class="today-all">Voir le planning</button></div></div>'; return; }
-  const ad = aheadDay(s), isToday = (ad || s.date) === todayISO();
+  const ad = aheadDay(s), isToday = (ad || s.date) === todayISO(), enRetard = !isToday && (ad || s.date) < todayISO();
   el.innerHTML = '<div class="today-inner">' +
-    '<div class="today-top"><span>' + (s.id === timerSid() ? 'En cours' : isToday ? 'Aujourd’hui' : 'Prochaine session') + ' · ' + esc(ad ? aheadLabel(ad, true) : s.jour + ' ' + s.dateLabel) + '</span><span class="today-tags"><span class="piste-tag' + (s.piste === 'Tampon' ? ' piste-tag--buffer' : '') + '">' + (s.extra ? 'Session rapide' : tnameHtml(s.piste) + '\u00a0· S' + s.week) + '</span>' + (s.extra ? '' : keyChip(s.piste, false)) + '</span></div>' +
+    '<div class="today-top"><span>' + (s.id === timerSid() ? 'En cours' : isToday ? 'Aujourd’hui' : enRetard ? 'En retard' : 'Prochaine session') + ' · ' + esc(ad ? aheadLabel(ad, true) : s.jour + ' ' + s.dateLabel) + '</span><span class="today-tags"><span class="piste-tag' + (s.piste === 'Tampon' ? ' piste-tag--buffer' : '') + '">' + (s.extra ? 'Session rapide' : tnameHtml(s.piste) + '\u00a0· S' + s.week) + '</span>' + (s.extra ? '' : keyChip(s.piste, false)) + '</span></div>' +
     '<div class="today-mid"><div class="today-bloc">' + esc(s.bloc) + '</div><div class="today-dur">' + fmtDur(s.minutes) + '</div>' + (keyOf(s.piste) ? '<div class="today-key">' + esc(keyRoot(keyOf(s.piste)) + ' ' + KEY_MODES[keyOf(s.piste).mode].n) + ' · ' + esc(keyNotes(keyOf(s.piste)).join(' ')) + '</div>' : '') + '<p class="today-obj">' + (myGoal(s) ? esc(myGoal(s)) : ideaOf(s) ? '<span class="today-idea">Idée du programme : ' + esc(ideaOf(s)) + '</span>' : '') + '</p>' + prevHtml(s, 'today-prev') + '</div>' +
     '<div class="today-bottom"><button type="button" class="btn btn-primary today-go" data-start="' + s.id + '">' + I.play + (s.id === timerSid() ? ' Reprendre' : ' Démarrer') + '</button><button type="button" class="today-all">Voir le planning</button></div></div>';
 }
