@@ -5414,9 +5414,12 @@ function openPlanLog(){ const m = isObj(meta.planLog) ? meta.planLog : {}, L = O
   el.innerHTML = '<div class="dlg-box dlg-wide" role="dialog" aria-modal="true"><h3>Historique du planning</h3><div class="lg-list">' + (h || '<p class="dim">Rien pour l’instant : les changements de dates, les sessions ajoutées, les recalages, les noms et les sessions faites s’inscriront ici.</p>') + '</div><div class="dlg-btns"><button type="button" class="btn" data-lg-close>Fermer</button></div></div>';
   el.hidden = false; const done = () => { el.hidden = true; el.innerHTML = ''; el.onclick = null; el.onkeydown = null; };
   el.onclick = ev => { if (ev.target.closest('[data-lg-close]') || (ev.target === el && PD_START === el)) done(); }; el.onkeydown = ev => { if (ev.key === 'Escape') done(); }; }
+/* étape 161 : nom de sauvegarde « date projet type heure » (unique à la minute, se range par date) */
+function backupName(type, ext){
+  const d = new Date(), p = n => String(n).padStart(2, '0'), proj = appTitle().split('—')[0].replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() || 'Planning';
+  return todayISO() + ' ' + proj + ' ' + type + ' ' + p(d.getHours()) + 'h' + p(d.getMinutes()) + '.' + ext; }
 async function exportBackup(){
-  const base = appTitle().split('—')[0].normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'Planning';
-  const txt = JSON.stringify(stateBundle('Sauvegarde manuelle'), null, 1), name = base + '-SAUVEGARDE-' + todayISO() + '.json';
+  const txt = JSON.stringify(stateBundle('Sauvegarde manuelle'), null, 1), name = backupName('SAUVEGARDE', 'json');
   const fallback = () => textDialog('Sauvegarde complète', 'Copie ce texte et enregistre-le dans un fichier .json. Pour restaurer : menu ⋯ puis « Restaurer ».', txt, true);
   try{ const dl = window.claude?.use ? await window.claude.use('downloads') : null;
     if (DESK){ if (await deskSave(name, txt)){ saveNote('Sauvegarde exportée · à l’instant'); toast('Sauvegarde enregistrée ✓'); } return; } /* étape 149 : app de bureau : message seulement une fois le fichier vraiment enregistré */
@@ -5482,7 +5485,7 @@ async function exportWithSounds(){
     say('Assemblage…');
     const pj = new Blob([JSON.stringify(stateBundle('Sauvegarde avec les sons'), null, 1)]), mj = new Blob([JSON.stringify(man, null, 1)]);
     entries.unshift({ name:'planning.json', blob:pj, crc:await blobCrc(pj) }, { name:'index.json', blob:mj, crc:await blobCrc(mj) });
-    const zip = zipBuild(entries), base = appTitle().split('—')[0].normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'Planning', name = base + '-SAUVEGARDE-SONS-' + todayISO() + '.zip';
+    const zip = zipBuild(entries), name = backupName('SAUVEGARDE SONS', 'zip');
     const na = man.files.filter(x => x.k === 'a').length, nc = man.files.filter(x => x.src === 'copie').length, nm = man.manque.length;
     const msg = 'Sauvegarde enregistrée ✓ · ' + na + ' son' + (na > 1 ? 's' : '') + (nc ? ' (dont ' + nc + ' en copie compressée)' : '') + (nm ? ' · ' + nm + ' introuvable' + (nm > 1 ? 's' : '') + ' ici' : '');
     say(null); const dl = window.claude?.use ? await window.claude.use('downloads') : null;
