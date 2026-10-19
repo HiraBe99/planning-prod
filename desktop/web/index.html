@@ -5602,10 +5602,11 @@ async function requestCloseProject(){
 const ROLE_LABELS = { warmup:'Échauffement', obj:'Setup', prod:'Production', ref:'Référence', notes:'Notes et évaluation', other:'Autre' };
 const ROLE_HINT = { warmup:'', obj:'', prod:'__OBJECTIF__', ref:'__COMPARE__', notes:'Refais un export WAV, écoute-le contre celui du début à volume égal, puis note le problème, la prochaine action et l’évaluation.', other:'' };
 function stepRole(x){ if (x.role && ROLE_LABELS[x.role]) return x.role; if (x.warmup) return 'warmup'; if (x.prod) return 'prod'; if (x.journal) return 'notes'; if (x.hint === '__COMPARE__') return 'ref'; if (/^(objectif|mise en place|setup)/i.test(x.name || '')) return 'obj'; return 'other'; }
-function shortName(n){ n = (n || '').trim(); if (n.length <= 12) return n; const w = n.split(/\s+/); return (w.length > 1 ? w[w.length - 1] : w[0]).slice(0, 14); }
+function shortName(n){ n = (n || '').trim(); if (n.length <= 12) return n; const w = n.split(/\s+/); return capFirst((w.length > 1 ? w[w.length - 1] : w[0]).slice(0, 14)); } /* étape 164 : l'abrégé commence par une majuscule, comme les autres étapes de la barre (« Notes et évaluation » → « Évaluation ») */
 function normStep(x){
   const role = stepRole(x); let name = String(x.name || '').trim() || 'Étape', short = x.short;
   if (role === 'obj' && /^(objectif|mise en place)$/i.test(name)){ if (!short || /^(objectif|mise en place)$/i.test(short)) short = 'Setup'; name = 'Setup'; } /* étape 158 : l'étape « Objectif » s'appelle « Setup » (formats enregistrés compris, sans toucher aux données) */
+  if (short && short !== name && name.toLowerCase().endsWith(String(short).toLowerCase())) short = capFirst(short); /* étape 164 : abrégé déjà enregistré en minuscule (« évaluation ») */
   const cust = x.cust !== undefined ? String(x.cust || '') : '';
   const hint = cust.trim() || (role === 'warmup' ? name + '.' : ROLE_HINT[role]);
   return { name, short: short || shortName(name), min: Math.max(1, Math.round(+x.min || 1)), role, cust, hint, warmup: role === 'warmup', prod: role === 'prod', journal: role === 'notes' };
