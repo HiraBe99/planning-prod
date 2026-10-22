@@ -317,10 +317,10 @@ summary, select, label.check, label.switch, label.radio, label.plan-check, .chec
 .next h3 .s-name{ cursor:text; border-radius:var(--r-1); padding:0 6px; margin:0 -6px; transition:background-color .14s ease; -webkit-box-decoration-break:clone; box-decoration-break:clone; }
 .next h3 .s-name:hover{ background:var(--accent-soft); }
 /* durée de la session : un clic ouvre le choix du format (1h, 2h…, sur mesure) */
-.next h3 .dur-btn{ appearance:none; border:none; background:none; font:inherit; color:inherit; letter-spacing:inherit; padding:0 4px; margin:0 -4px 0 -2px; border-radius:var(--r-1); cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
-.next h3 .dur-btn svg{ opacity:.6; width:14px; height:14px; transition:transform .14s ease; }
-.next h3 .dur-btn:hover, .next h3 .dur-btn[aria-expanded="true"]{ background:color-mix(in srgb, var(--hero-ink, var(--text)) 10%, transparent); }
-.next h3 .dur-btn[aria-expanded="true"] svg{ transform:rotate(180deg); }
+.next h3 .dur-btn, .pre-card .step-name .dur-btn{ appearance:none; border:none; background:none; font:inherit; color:inherit; letter-spacing:inherit; padding:0 4px; margin:0 -4px 0 -2px; border-radius:var(--r-1); cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
+.next h3 .dur-btn svg, .pre-card .step-name .dur-btn svg{ opacity:.6; width:14px; height:14px; transition:transform .14s ease; }
+.next h3 .dur-btn:hover, .next h3 .dur-btn[aria-expanded="true"], .pre-card .step-name .dur-btn:hover, .pre-card .step-name .dur-btn[aria-expanded="true"]{ background:color-mix(in srgb, var(--hero-ink, var(--text)) 10%, transparent); }
+.next h3 .dur-btn[aria-expanded="true"] svg, .pre-card .step-name .dur-btn[aria-expanded="true"] svg{ transform:rotate(180deg); }
 .fmt-pop, .snd-pop{ position:fixed; z-index:60; width:min(320px, calc(100vw - 24px)); display:grid; gap:2px; padding:6px; background:var(--bg-panel); color:var(--text); border:1px solid var(--frame, var(--border)); border-radius:var(--r-2); box-shadow:var(--shadow-pop); font-family:var(--font-body); font-size:var(--fs-2); font-weight:400; letter-spacing:0; }
 .fmt-pop .fp-item, .snd-pop .fp-item{ appearance:none; border:none; background:none; color:inherit; font:inherit; display:flex; align-items:baseline; justify-content:space-between; gap:var(--s-3); padding:var(--s-2) var(--s-3); border-radius:var(--r-1); cursor:pointer; text-align:left; }
 .fmt-pop .fp-item b, .snd-pop .fp-item b{ font-weight:600; }
@@ -1685,6 +1685,7 @@ textarea.ai-fill{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-
 /* carte de lancement plus imposante */
 .t-pre .pre-card{ padding:var(--s-6) var(--s-5) var(--s-6); margin-top:var(--s-3); }
 .pre-card .dur-lc{ text-transform:none; }
+.pre-card .step-name .dur-btn{ vertical-align:baseline; } /* étape 165 : la durée se change aussi depuis l'écran de préparation */
 .t-pre .pre-card .step-name{ font-size:32px; line-height:1.1; letter-spacing:.03em; }
 .t-pre .pre-card .step-count{ font-size:var(--fs-4); font-weight:500; color:color-mix(in srgb, var(--hero-ink) 88%, transparent); margin-top:var(--s-2); } /* à l'échelle des étiquettes en gras et du gros bouton */
 @media (max-width:520px){ .t-pre .pre-card .step-count{ font-size:var(--fs-3); } }
@@ -3598,7 +3599,7 @@ function renderNext(){
     el.innerHTML = ''; return; }
   const ad = aheadDay(s), isToday = (ad || s.date) === todayISO(), enRetard = !isToday && (ad || s.date) < todayISO(), pi = s.id === timerSid() ? null : prolongInfo(s), rc = s.extra || placee(s) ? null : recaleInfo(); /* étape 163 : « En retard » quand la date est passée (comme la ligne) */ /* étape 125 : rien à ajouter pendant une session en cours ; étape 163 : ni « Recaler » sur une session que tu as placée toi-même (le bouton viserait une autre session) */
   el.innerHTML = '<div class="card next"><div class="next-top"><span class="piste-tag' + (s.piste === 'Tampon' ? ' piste-tag--buffer' : '') + '">' + tnameHtml(s.piste) + '\u00a0· S' + s.week + '</span>' + keyChip(s.piste, true) + intentChip(s.piste) + (s.essentiel ? '<span class="s-ess">Essentiel</span>' : '') + '<span class="next-when">' + (s.id === timerSid() ? 'En cours' : isToday ? "Aujourd’hui" : enRetard ? 'En retard' : 'Prochaine session') + ' · ' + esc(ad ? aheadLabel(ad, true) : s.jour + ' ' + s.dateLabel) + '</span></div>' +
-    '<h3><span class="s-name" data-bid="' + s.id + '" tabindex="0" title="Cliquer pour renommer">' + esc(s.bloc) + '</span> · ' + (s.extra ? fmtDur(s.minutes) : '<button type="button" class="dur-btn" data-fmtpick="' + s.id + '" aria-haspopup="menu" aria-expanded="false" title="Changer la durée de cette session">' + fmtDur(s.minutes) + I.chevDown + '</button>') + '</h3>' + (() => { const x = trackIntent(s.piste); return x ? '<div class="next-intent" data-intent="' + esc(pNum(s.piste)) + '" role="button" tabindex="0" title="Fil rouge du morceau · clique pour le modifier"><b>Fil rouge</b> ' + esc(intentText(x)) + '</div>' : ''; })() + '<div class="next-lbl">But de la session</div>' + nextGoalHtml(s) + nextCritsHtml(s) + (myGoal(s) ? '' : ideaHtml(s, 'next-idea')) + prevHtml(s, 'next-test next-prev') +
+    '<h3><span class="s-name" data-bid="' + s.id + '" tabindex="0" title="Cliquer pour renommer">' + esc(s.bloc) + '</span> · ' + '<button type="button" class="dur-btn" data-fmtpick="' + s.id + '" aria-haspopup="menu" aria-expanded="false" title="Changer la durée de cette session">' + fmtDur(s.minutes) + I.chevDown + '</button>' /* étape 165 : sessions rapides et « + 1 » comprises */ + '</h3>' + (() => { const x = trackIntent(s.piste); return x ? '<div class="next-intent" data-intent="' + esc(pNum(s.piste)) + '" role="button" tabindex="0" title="Fil rouge du morceau · clique pour le modifier"><b>Fil rouge</b> ' + esc(intentText(x)) + '</div>' : ''; })() + '<div class="next-lbl">But de la session</div>' + nextGoalHtml(s) + nextCritsHtml(s) + (myGoal(s) ? '' : ideaHtml(s, 'next-idea')) + prevHtml(s, 'next-test next-prev') +
     '<div class="btn-row"><button class="btn btn-primary" data-start="' + s.id + '" type="button">' + I.play + ' ' + (T && !T.finished && T.id === s.id && T.started ? 'Reprendre la session' : 'Démarrer la session') + '</button>' + (pi ? '<button type="button" class="text-btn next-prolong" data-prolong="' + s.id + '" title="' + esc('Pas fini ? Une session « ' + pi.fam + ' » de plus, ' + (plusDay(s).hole ? 'le ' + dayShort(plusDay(s).hole) + ' (jour libre) : rien ne recule.' : 'avant celle-ci. La suite du planning recule d’une session.')) + '">+ 1 session ' + esc(pi.fam) + '</button>' : '') +
       (rc ? '<button type="button" class="text-btn next-prolong" data-recale="' + rc.id + '" title="' + esc('La suite du planning repart de ' + aheadLabel(rc.d, true).toLowerCase() + ', au rythme prévu. Les sessions faites ne bougent pas.') + '">Recaler le planning</button>' : '') + '</div></div>';
 }
@@ -5013,7 +5014,7 @@ function renderTimer(){
     const skip = '<div class="pre-skip"><button type="button" class="text-btn" data-tc="toggle">Passer la préparation ' + I.play + '</button></div>';
     el.innerHTML = '<div class="timer-inner">' + head + skip + '<div class="t-grid t-pre"><div class="t-main">' +
       ritStartHtml(s).replace('class="ritual"', 'class="ritual ritual-top"') + goal +
-      '<div class="t-card t-clock-card pre-card"><button type="button" class="icon-btn pre-more" id="rules-edit" aria-label="Modifier les règles de session" title="Modifier les règles : intitulés, ajout, suppression, façon de se cocher"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><circle cx="4.5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15.5" cy="10" r="1.6"/></svg></button><div class="step-name">' + esc(s.bloc) + ' · <span class="dur-lc">' + fmtDur(T.steps.reduce((a, x) => a + x.min, 0)) + '</span></div><div class="step-count">Première étape : ' + esc(st.name) + ', ' + st.min + '\u00a0min</div>' +
+      '<div class="t-card t-clock-card pre-card"><button type="button" class="icon-btn pre-more" id="rules-edit" aria-label="Modifier les règles de session" title="Modifier les règles : intitulés, ajout, suppression, façon de se cocher"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><circle cx="4.5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15.5" cy="10" r="1.6"/></svg></button><div class="step-name">' + esc(s.bloc) + ' · ' + (s.free || !s.id ? '<span class="dur-lc">' + fmtDur(T.steps.reduce((a, x) => a + x.min, 0)) + '</span>' : '<button type="button" class="dur-btn dur-lc" data-fmtpick="' + s.id + '" aria-haspopup="menu" aria-expanded="false" title="Changer la durée de cette session">' + fmtDur(T.steps.reduce((a, x) => a + x.min, 0)) + I.chevDown + '</button>') + '</div><div class="step-count">Première étape : ' + esc(st.name) + ', ' + st.min + '\u00a0min</div>' +
       '<div class="ready" id="ready-top">' + readyMsgHtml(s) + '</div>' +
       '<div class="timer-controls"><button type="button" id="start-btn" class="btn big-start ' + (all ? 'btn-primary' : 'btn-soft') + '" data-tc="toggle">' + I.play + ' ' + (all && T.steps[0] && T.steps[0].role === 'warmup' ? 'Démarrer l’échauffement' : 'Démarrer la session') + '</button></div>' + /* étape 83 : « échauffement » seulement si la 1re étape en est un */
       '<div class="clock-sub" id="tot-left"></div></div>' +
@@ -5618,14 +5619,17 @@ function fmtOf(id){ const F = fmts(); return F.find(f => f.id === id) || F[0]; }
 function fmtPickClose(){ document.querySelectorAll('.fmt-pop').forEach(p => p.remove()); document.querySelectorAll('[data-fmtpick][aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false')); }
 function fmtPickOpen(btn){
   const id = btn.dataset.fmtpick, s = BY_ID[id]; if (!s) return; fmtPickClose();
-  const o = isObj(meta.fmtOver) ? meta.fmtOver[id] : null, custom = isObj(o), F = fmts(), minT = customMin();
+  const xe = s.extra ? extrasList().find(x => x && x.id === id) : null; /* étape 165 : session rapide ou « + 1 » : sa durée est gardée avec elle */
+  const base = xe ? dayFmt(xe.date) : s.fmtBase;
+  const o = xe ? (Array.isArray(xe.steps) && xe.steps.length ? { steps: xe.steps } : xe.fmt) : (isObj(meta.fmtOver) ? meta.fmtOver[id] : null), custom = isObj(o), F = fmts(), minT = customMin();
+  const modifie = xe ? (custom || xe.fmt !== base) : !!s.fmtOver;
   const pop = document.createElement('div'); pop.className = 'fmt-pop'; pop.setAttribute('role', 'menu'); pop.dataset.for = id;
   pop.innerHTML = F.map(f => { const on = !custom && s.fmt === f.id;
-      return '<button type="button" role="menuitemradio" aria-checked="' + on + '" class="fp-item' + (on ? ' on' : '') + '" data-fmtset="' + esc(f.id) + '"><b>' + esc(fmtLabel(f)) + '</b><span>' + (f.id === s.fmtBase ? 'prévu ce jour' : fmtDur(fmtMinutes(f))) + '</span></button>'; }).join('') +
+      return '<button type="button" role="menuitemradio" aria-checked="' + on + '" class="fp-item' + (on ? ' on' : '') + '" data-fmtset="' + esc(f.id) + '"><b>' + esc(fmtLabel(f)) + '</b><span>' + (f.id === base ? 'prévu ce jour' : fmtDur(fmtMinutes(f))) + '</span></button>'; }).join('') +
     '<div class="fp-custom' + (custom ? ' on' : '') + '"><div class="fp-ch"><b>Sur mesure</b>' + (custom ? '<span>' + fmtDur(s.minutes) + '</span>' : '') + '</div><div class="fp-row">' +
       [45, 90, 180].filter(m => m >= minT && m <= LIM.sessionMin).map(m => '<button type="button" class="chip" data-fmtmin="' + m + '">' + fmtDur(m) + '</button>').join('') +
       '<span class="fp-in"><input type="text" data-dur placeholder="ex. 4h, 1h30, 50" aria-label="Durée sur mesure (minutes, ou 1h30, 4h…)" data-fmtmin-in><button type="button" class="chip" data-fmtmin-ok>OK</button></span></div></div>' +
-    (s.fmtOver ? '<button type="button" class="fp-reset" data-fmtset="">Revenir au format prévu (' + esc(fmtLabel(fmtOf(s.fmtBase))) + ')</button>' : '') +
+    (modifie ? '<button type="button" class="fp-reset" data-fmtset="">Revenir au format prévu (' + esc(fmtLabel(fmtOf(base))) + ')</button>' : '') +
     '';
   /* posé sur la page (pas dans la carte, dont les couleurs sont celles du bandeau) : couleurs normales du thème, sous la durée */
   document.body.appendChild(pop); btn.setAttribute('aria-expanded', 'true');
@@ -5635,9 +5639,18 @@ function fmtPickOpen(btn){
   const f = pop.querySelector('.fp-item.on, .fp-item'); if (f) f.focus({ preventScroll:true });
 }
 function fmtPickSet(id, v){
-  const s = BY_ID[id]; if (!s) return; meta.fmtOver = Object.assign({}, isObj(meta.fmtOver) ? meta.fmtOver : {});
-  if (!v || v === s.fmtBase) delete meta.fmtOver[id]; else meta.fmtOver[id] = v;
-  if (!Object.keys(meta.fmtOver).length) delete meta.fmtOver;
+  const s = BY_ID[id]; if (!s) return;
+  if (s.extra){ /* étape 165 : la durée d'une session rapide ou « + 1 » est gardée dans sa fiche : elle la suit quand elle change de jour */
+    const L = extrasList(), e = L.find(x => x && x.id === id); if (!e) return;
+    if (!v || v === dayFmt(e.date)){ delete e.steps; e.fmt = dayFmt(e.date); }
+    else if (typeof v === 'string'){ if (!fmts().some(f => f.id === v)) return; delete e.steps; e.fmt = v; }
+    else if (isObj(v) && Array.isArray(v.steps) && v.steps.length){ e.steps = cloneJ(v.steps); }
+    else return;
+    meta.extras = L.slice();
+  } else {
+    meta.fmtOver = Object.assign({}, isObj(meta.fmtOver) ? meta.fmtOver : {});
+    if (!v || v === s.fmtBase) delete meta.fmtOver[id]; else meta.fmtOver[id] = v;
+    if (!Object.keys(meta.fmtOver).length) delete meta.fmtOver; }
   fmtPickClose(); saveMeta(true); renderAll();
   /* minuteur de cette session ouvert (lancé ou non) : il prend tout de suite la nouvelle durée ; l'étape en cours garde le temps déjà passé */
   if (T && T.id === id && !T.finished){

@@ -1,5 +1,5 @@
-// copie hors ligne de Planning prod (version ca2bd83bdd) : réseau d'abord pour être toujours à jour, la copie seulement sans connexion
-const V = 'planning-prod-ca2bd83bdd', F = ['./', './index.html', './manifest.webmanifest', './icone-192.png', './icone-512.png', './icone-180.png'];
+// copie hors ligne de Planning prod (version a4faeb97e6) : réseau d'abord pour être toujours à jour, la copie seulement sans connexion
+const V = 'planning-prod-a4faeb97e6', F = ['./', './index.html', './manifest.webmanifest', './icone-192.png', './icone-512.png', './icone-180.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(F)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => { const r = e.request; if (r.method !== 'GET' || new URL(r.url).origin !== location.origin) return;
