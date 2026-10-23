@@ -1466,6 +1466,8 @@ body:has(#minibar:not([hidden])) .page{ padding-bottom:88px; }
 /* repère attrapable : curseur de glissement latéral */
 .au-wave.on-cue, .au-wave.cue-drag, .au-wave.loop.on-cue{ cursor:ew-resize; } .au-wave.loop.on-anc{ cursor:pointer; } .au-wave{ touch-action:pan-y; }
 .au-bpm{ font-family:var(--font-mono); } .au-file-row .chip{ white-space:nowrap; }
+.au-home{ width:40px; min-width:40px; height:40px; padding:0; } .au-home svg{ opacity:.8; width:15px; height:15px; } /* étape 166 : retour au début du fichier */
+.au-tr .au-home{ width:44px; min-width:44px; height:44px; }
 @media (max-width:560px){ .au-file-row{ flex-wrap:wrap; } .au-file-row .au-info{ flex:1 1 100%; } .au-file-row .au-del{ margin-left:auto; } } /* ancres : une seule ligne (défile de côté), hauteur fixe */ /* téléphone : nom et infos sur la 1re ligne, boucle, longueur et tempo dessous — boucle active ou non, rien ne bouge */
 @media (max-width:370px){ .au-file-row.looping{ gap:6px; } .au-file-row.looping .chip{ padding:0 9px; } } .au-bpm-in{ width:64px !important; min-height:24px !important; padding:0 6px !important; font-family:var(--font-mono); }
 .au-wave.empty span{ font-size:var(--fs-1); color:var(--text-dim); padding:0 var(--s-3); text-align:center; }
@@ -2506,6 +2508,7 @@ const I = {
   target:'<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2.4" fill="currentColor"/></svg>',
   flag:'<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 2v12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M3 2.6c2-1 3.5 1 5.5 0S13 2.6 13 2.6v6.8s-2.5-1.6-4.5-.6-3.5-1-5.5 0V2.6Z" fill="currentColor"/></svg>',
   note:'<svg width="15" height="15" viewBox="0 0 20 20" fill="none"><path d="M5 3h10v14H5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 7h4M8 10h4M8 13h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  home:'<svg width="13" height="13" viewBox="0 0 20 20" aria-hidden="true"><path d="M15 4L7 10l8 6z" fill="currentColor"/><rect x="4" y="4" width="2" height="12" rx="1" fill="currentColor"/></svg>', /* étape 166 : revenir au début du fichier */
   play:'<svg width="15" height="15" viewBox="0 0 20 20"><path d="M6 4l10 6-10 6z" fill="currentColor"/></svg>',
   playBig:'<svg width="26" height="26" viewBox="0 0 20 20"><path d="M6 4l10 6-10 6z" fill="currentColor"/></svg>',
   pause:'<svg width="26" height="26" viewBox="0 0 20 20"><rect x="5" y="4" width="3.4" height="12" rx="1" fill="currentColor"/><rect x="11.6" y="4" width="3.4" height="12" rx="1" fill="currentColor"/></svg>',
@@ -3518,7 +3521,9 @@ function prolong(nsId){ const ns = BY_ID[nsId], pi = prolongInfo(ns); if (!pi) r
   if (extrasList().length >= LIM.extras){ limitToast('sessions rapides', LIM.extras); return; }
   const snap = takeSnapshot('Avant : une session ' + pi.fam + ' de plus'), td = todayISO(), { hole: ad, day } = plusDay(ns), pp = pi.piste || ns.piste, e0 = trackEndISO(pp);
   if (!ad && ns.date >= td && !ns.buffer){ const n0 = (ns.slot != null ? ns.slot : ns.idx) + slotOff() + shiftSlots(meta.shifts, ns.idx); computeResume(ns.id, isoOf(slotDate(n0 + 1)), false, true); } /* étape 126 : les sessions d'avant ne bougent jamais (après un recalage, la précédente peut être prévue plus tard) */ /* une session joker n'est pas repoussée : elle sert justement à rattraper */
-  const e = { id:'x' + Date.now().toString(36), date:day, fmt:ad ? dayFmt(ad) : ns.fmt, bloc:pi.fam, objectif:'', test:'', essentiel:!!ns.essentiel, prolong:true }; if (pi.piste) e.piste = pi.piste;
+  /* étape 167 : la session ajoutée prend le format du jour où elle se pose (comme toute session de ce jour).
+     Avant : le format de la session d'origine — faux dès qu'elle était en retard (elle apportait la durée d'un autre jour) ou après un recalage (créneaux décalés). */
+  const e = { id:'x' + Date.now().toString(36), date:day, fmt:dayFmt(day), bloc:pi.fam, objectif:'', test:'', essentiel:!!ns.essentiel, prolong:true }; if (pi.piste) e.piste = pi.piste;
   meta.extras = extrasList().concat([e]); firstRender = true; renderAll();
   const s2 = BY_ID[e.id]; planLog('+ 1 session : ' + (s2 ? s2.bloc : pi.fam) + ' (' + dayShort(day) + ')' + endMsg(pp, e0)); saveMeta(true); undoToast((s2 ? s2.bloc : pi.fam) + ' ajoutée' + endMsg(pp, e0), snap); }
 document.addEventListener('click', ev => { const b = ev.target.closest && ev.target.closest('[data-prolong]'); if (!b) return; ev.preventDefault(); prolong(b.dataset.prolong); });
@@ -7864,6 +7869,8 @@ function auABReady(sid){ return auABSlots(sid).length >= 2; }
 /* l'autre morceau de l'A/B pour la case cur : celui choisi avec ↔ (st.abTo), sinon Après / Avant depuis une Réf., sinon la Réf. de l'analyse, sinon la première autre case */
 function auABPartnerOf(sid, cur){ const st = auState(sid), have = auABSlots(sid), want = st.abTo && st.abTo[cur]; if (want && want !== cur && have.includes(want)) return want;
   if (AB_REFS.includes(cur)) return ['b', 'a'].find(k => have.includes(k)) || auABOther(sid, cur);
+  /* étape 166 : depuis Avant ou Après, l'autre des deux d'abord — c'est la comparaison de la session (ancien export contre nouveau). Avant : on partait sur la Réf. 1. */
+  { const o = cur === 'a' ? 'b' : cur === 'b' ? 'a' : ''; if (o && have.includes(o)) return o; }
   return (st.anRef && have.includes(st.anRef)) ? st.anRef : (st.abRef && have.includes(st.abRef)) ? st.abRef : AB_REFS.find(k => have.includes(k)) || have.find(k => k !== cur) || null; }
 function auABPeek(sid){ const st = auState(sid), cur = st.slot; if (!auABSlots(sid).includes(cur)) return null; const to = auABPartnerOf(sid, cur); return to ? [cur, to] : null; }
 function auABNext(sid){ const st = auState(sid), cur = st.slot, others = auABSlots(sid).filter(k => k !== cur); if (others.length < 2) return; const now = auABPartnerOf(sid, cur), nx = others[(others.indexOf(now) + 1) % others.length];
@@ -7954,7 +7961,8 @@ function auRenderIn(el, sid, s){
         '<button type="button" class="chip au-bpm" data-au-bpm title="' + (it && it.bpm ? (it.bpmU ? 'Tempo choisi à la main' : 'Tempo mesuré sur les passages où la pulsation est nette' + (it.bpmS != null ? ' (écart ' + String(it.bpmS).replace('.', ',') + ' BPM : ' + (it.bpmS > 0.3 ? 'tempo qui varie, vinyle ou live ?' : 'stable') + ')' : '')) + ' ; clique pour le corriger' + (!it.bpmU && Math.abs(it.bpm - Math.round(it.bpm)) > 0.15 ? '. Mesuré à ' + String(it.bpm).replace('.', ',') + ' : le fichier tourne entre ' + Math.floor(it.bpm) + ' et ' + Math.ceil(it.bpm) + ' (vinyle ou transfert un peu lent ou rapide ?) ; tape le bon tempo rond' : '') : 'Mesure du tempo…') + '">' + (it && it.bpm ? bpmTxt(it.bpm) : '…') + ' BPM</button>' +
       (lib ? '' : '<button type="button" class="icon-btn au-del" data-au-del aria-label="Retirer ce fichier" title="Retirer ce fichier">' + I.close + '</button>') + '</div>' : '') +
     /* l'écoute d'abord (lecture, forme d'onde, temps) : elle reste sous les yeux même avec beaucoup de repères */
-    '<div class="au-tr">' + (it ? '<button type="button" class="btn btn-primary au-play" data-au-play aria-label="' + (playing ? 'Pause' : 'Lecture') + '" title="' + (playing ? 'Pause' : 'Lecture depuis ' + auTime(auPosOf(st, st.slot))) + '">' + (playing ? I.pause : I.play) + '</button>' : '') +
+    '<div class="au-tr">' + (it ? '<button type="button" class="icon-btn au-home" data-au-home aria-label="Revenir au début" title="Revenir au début du fichier' + (st.loop ? ' : la boucle y repart' : '') + '">' + I.home + '</button>' : '') + /* étape 166-167 : à côté de Lecture (largeur fixe : rien ne bouge quand on change de fichier) */
+      (it ? '<button type="button" class="btn btn-primary au-play" data-au-play aria-label="' + (playing ? 'Pause' : 'Lecture') + '" title="' + (playing ? 'Pause' : 'Lecture depuis ' + auTime(auPosOf(st, st.slot))) + '">' + (playing ? I.pause : I.play) + '</button>' : '') +
       '<div class="au-wave' + (it && AU.has[aid] !== false || assetOk(it) ? '' : ' empty') + '" data-au-wave>' + (it && (AU.has[aid] !== false || assetOk(it)) ? '<canvas aria-hidden="true"></canvas>' : '<span>' + (it ? 'Fichier ajouté sur un autre appareil : dépose-le ici pour l’écouter sur celui-ci' : (st.slot === 'a' && mode === 'obj' ? 'Dépose ici ton morceau : l’export du début de session' : AU_SLOT_DROP[st.slot]) + ', ou touche « + Ajouter »') + '</span>') + '</div>' +
       (it ? '<span class="au-time">' + auTime(playing ? auPos() : auPosOf(st, st.slot)) + ' / ' + auTime(dur) + '</span>' : '') + '</div>' +
     /* référence : ses moments (repère, rôle, adjectif, pourquoi), juste sous la forme d'onde (étape 63) ; le premier est le point de départ de la lecture */
@@ -9611,6 +9619,11 @@ document.addEventListener('click', ev => {
     /* la boucle part d'où en est la lecture */
     if (st.loop) st.loopA[st.slot] = AU.cur && AU.cur.sid === sid ? auPos() : auPosOf(st, st.slot);
     auLoopLive(sid); auRenderAll(sid); return; }
+  if (ev.target.closest('[data-au-home]')){ /* étape 166 : retour au début du fichier (la boucle y repart) */
+    const it0 = auItem(auAid(sid, st.slot)); if (!it0) return;
+    st.posBy[st.slot] = 0; if (st.loop){ st.loopA = st.loopA || {}; st.loopA[st.slot] = 0; }
+    if (AU.cur && AU.cur.sid === sid) auPlay(sid, st.slot, 0); else { auLoopLive(sid); auRenderAll(sid); }
+    return; }
   if (ev.target.closest('[data-au-loop-len]')) return; /* le menu se règle par « change » */
   if (ev.target.closest('[data-au-abx]')){ auABNext(sid); return; }
   if (ev.target.closest('[data-au-ab]')){ auAB(sid); return; }
