@@ -722,6 +722,23 @@ table.t{ width:100%; border-collapse:collapse; font-size:var(--fs-3); }
 .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom,0px) + 80px); z-index:90; display:flex; align-items:center; gap:var(--s-3);
   max-width:calc(100% - 32px); background:var(--text); color:var(--bg); padding:var(--s-2) var(--s-4); min-height:var(--h-2); border-radius:var(--r-pill); font-size:var(--fs-2); box-shadow:var(--shadow-pop); }
 .toast-act{ appearance:none; border:none; background:none; color:inherit; font-weight:700; font-size:var(--fs-2); text-decoration:underline; cursor:pointer; padding:var(--s-1); flex:none; }
+/* ===== étape 168 : minuteur épinglé (petite fenêtre toujours au-dessus) ===== */
+body.mini-win{ overflow:hidden; background:var(--bg); }
+body.mini-win > *:not(#miniwrap){ display:none !important; }
+#miniwrap{ position:fixed; inset:0; display:flex; flex-direction:column; gap:6px; padding:10px 12px 12px; background:var(--bg); color:var(--text); user-select:none; -webkit-user-select:none; }
+.mini-top{ display:flex; align-items:baseline; gap:8px; min-width:0; }
+.mini-time{ font-family:var(--font-mono); font-size:30px; font-weight:700; line-height:1; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
+.mini-sub{ font-size:12px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; text-align:right; }
+.mini-name{ font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mini-bar{ height:4px; border-radius:2px; background:var(--field); overflow:hidden; }
+.mini-bar i{ display:block; height:100%; background:var(--accent); width:0; transition:width .3s linear; }
+.mini-btns{ display:flex; gap:6px; margin-top:auto; }
+.mini-btns button{ appearance:none; border:1px solid var(--frame-f, var(--field-border)); background:var(--field); color:var(--text); font:inherit; font-size:12px; font-weight:600; height:34px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:0 10px; }
+.mini-btns button:hover{ filter:brightness(1.07); }
+.mini-btns .mini-go{ flex:0 0 46px; background:var(--accent); color:var(--on-accent); border-color:transparent; }
+.mini-btns .mini-next{ flex:1 1 auto; }
+.mini-btns svg{ width:14px; height:14px; }
+.mini-off{ font-size:12px; color:var(--text-dim); }
 .minibar{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom,0px) + var(--s-4)); z-index:40; display:flex; align-items:center; gap:var(--s-3);
   min-height:var(--h-3); max-width:calc(100% - 32px); background:var(--bg-panel); border:1px solid var(--accent); box-shadow:var(--shadow-pop); cursor:pointer; }
 .au-ab{ font-weight:700; letter-spacing:.02em; } .au-abp{ font-weight:400; letter-spacing:0; margin-left:6px; opacity:.75; font-family:var(--font-mono); font-size:var(--fs-1); } @container au (max-width:520px){ .au-abp{ display:none; } }
@@ -2132,6 +2149,7 @@ button.s-jour.s-jour--guess{ color:var(--text-dim); font-style:italic; }
 </div>
 <div class="timer" id="timer" hidden></div>
 <div class="minibar" id="minibar" hidden></div>
+<div id="miniwrap" hidden></div>
 <div class="today" id="todayview" hidden></div><button type="button" id="today-open" hidden>Vue Aujourd’hui</button>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <div class="dlg" id="dialog" hidden></div>
@@ -2508,6 +2526,7 @@ const I = {
   target:'<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2.4" fill="currentColor"/></svg>',
   flag:'<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 2v12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M3 2.6c2-1 3.5 1 5.5 0S13 2.6 13 2.6v6.8s-2.5-1.6-4.5-.6-3.5-1-5.5 0V2.6Z" fill="currentColor"/></svg>',
   note:'<svg width="15" height="15" viewBox="0 0 20 20" fill="none"><path d="M5 3h10v14H5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 7h4M8 10h4M8 13h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  pin:'<svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="13" height="9" rx="1.6"/><path d="M7 16h6"/><path d="M10 12.5V16"/></svg>',
   home:'<svg width="13" height="13" viewBox="0 0 20 20" aria-hidden="true"><path d="M15 4L7 10l8 6z" fill="currentColor"/><rect x="4" y="4" width="2" height="12" rx="1" fill="currentColor"/></svg>', /* étape 166 : revenir au début du fichier */
   play:'<svg width="15" height="15" viewBox="0 0 20 20"><path d="M6 4l10 6-10 6z" fill="currentColor"/></svg>',
   playBig:'<svg width="26" height="26" viewBox="0 0 20 20"><path d="M6 4l10 6-10 6z" fill="currentColor"/></svg>',
@@ -4925,6 +4944,130 @@ function openTimer(){ document.getElementById('timer').hidden = false; document.
 function closeTimer(){ document.getElementById('timer').hidden = true; document.body.style.overflow = ''; renderMinibar(); try{ renderNext(); renderCarnet(); }catch(e){}
   try{ if (lastFocus !== null && lastFocus !== focusWeek()){ syncFocus(); applyFilter(); renderSplits(); fitLabels(); } }catch(e){} } /* étape 81 : retour au planning, la semaine de la session du minuteur est celle ouverte */
 function minimize(){ closeTimer(); }
+/* ===== étape 168 : minuteur épinglé =====
+ Une petite fenêtre, toujours au-dessus des autres applications, pendant que tu produis.
+ - App de bureau : une vraie fenêtre (Tauri), posée où tu veux.
+ - Navigateur qui le permet (Chrome, Edge) : la fenêtre flottante du navigateur.
+ - Ailleurs (Claude, Safari, téléphone) : rien à proposer, la barre réduite fait le travail.
+ Les deux fenêtres parlent par la mémoire du navigateur : la principale écrit l'état (MINI_BEAT) chaque seconde,
+ la petite écrit qu'elle est vivante (MINI_ON) et ses commandes (MINI_CMD). Aucune logique de minuteur n'est dupliquée. */
+const MINI_ON = 'dnb-mini-on', MINI_BEAT = 'dnb-mini-v1', MINI_CMD = 'dnb-mini-cmd';
+const MINI_WIN = /[?&]mini=1/.test(location.search || '');
+const miniAlive = () => { try{ return +(localStorage.getItem(MINI_ON) || 0) > Date.now() - 6000; }catch(e){ return false; } };
+let MINI_PIP = null, miniTick = 0;
+/* proposé seulement là où une fenêtre peut vraiment sortir de la page : l'app de bureau, ou un navigateur d'ordinateur qui sait le faire.
+   Dans Claude (page dans un cadre) et sur téléphone : rien, la barre réduite fait le travail. */
+function miniCan(){ if (MINI_WIN) return false; if (DESK) return true;
+  try{ return !!window.documentPictureInPicture && !window.claude && window.top === window.self && !matchMedia('(pointer:coarse)').matches; }catch(e){ return false; } }
+function miniOpenState(){ return !!(MINI_PIP || miniAlive()); }
+/* état envoyé à la petite fenêtre */
+function miniState(){
+  if (!T || T.finished) return { off:1, at:Date.now() };
+  const s = cur(), st = T.steps[T.idx];
+  return { at:Date.now(), t:remainingMs(), run:!!T.running, started:!!T.started, step:st.name, i:T.idx, n:T.steps.length,
+    name:(s && s.bloc) || 'Session', min:st.min, th:document.documentElement.getAttribute('data-theme') || '' };
+}
+function miniPush(){ if (MINI_WIN) return; const v = miniState();
+  if (MINI_PIP) miniDraw(MINI_PIP.document, v);
+  if (miniAlive()){ try{ localStorage.setItem(MINI_BEAT, JSON.stringify(v)); }catch(e){} } }
+/* commandes venues de la petite fenêtre (elle n'exécute rien elle-même) */
+let miniCmdAt = 0;
+function miniPoll(){
+  if (MINI_WIN) return;
+  try{ const c = JSON.parse(localStorage.getItem(MINI_CMD) || 'null');
+    if (c && c.at > miniCmdAt){ miniCmdAt = c.at; miniDo(c.c); } }catch(e){}
+  miniPush();
+  if (!miniOpenState() && !MINI_PIP){ clearInterval(miniTick); miniTick = 0; renderTimer(); }
+}
+function miniDo(c){
+  if (c === 'toggle'){ if (T) timerControl('toggle'); }
+  else if (c === 'next'){ if (T && !T.finished) timerControl('next'); }
+  else if (c === 'open'){ miniClose(); openTimer(); try{ if (DESK && window.__TAURI__ && window.__TAURI__.window) window.__TAURI__.window.getCurrentWindow().setFocus(); }catch(e){} }
+}
+function miniWatch(){ if (miniTick) return; miniTick = setInterval(miniPoll, 300); miniPush(); }
+/* ouverture */
+async function miniOpen(){
+  if (MINI_WIN) return;
+  if (DESK){
+    try{
+      const TW = window.__TAURI__ || {}, Ctor = TW.webviewWindow && TW.webviewWindow.WebviewWindow;
+      if (!Ctor) throw new Error('fenêtre indisponible');
+      try{ const old = await Ctor.getByLabel('mini'); if (old) await old.close(); }catch(e){}
+      const w = new Ctor('mini', { url:'index.html?mini=1', title:'Minuteur', width:300, height:148, minWidth:240, minHeight:120,
+        alwaysOnTop:true, resizable:true, skipTaskbar:false, focus:true });
+      await new Promise((ok, no) => { w.once('tauri://created', ok); w.once('tauri://error', e => no(e)); setTimeout(ok, 1500); });
+      try{ await w.setAlwaysOnTop(true); }catch(e){ console.error('au-dessus', e); } /* à la création, l'option n'est pas toujours prise : on la repose */
+      try{ localStorage.setItem(MINI_ON, String(Date.now())); }catch(e){}
+      miniWatch(); renderTimer(); toast('Minuteur épinglé : la petite fenêtre reste au-dessus');
+    }catch(e){ console.error('mini', e); toast('Impossible d’ouvrir la petite fenêtre'); }
+    return; }
+  if (window.documentPictureInPicture){
+    try{
+      const w = await documentPictureInPicture.requestWindow({ width:300, height:150 });
+      MINI_PIP = w; miniStyle(w.document); miniDraw(w.document, miniState());
+      w.document.body.addEventListener('click', ev => { const b = ev.target.closest && ev.target.closest('[data-mini]'); if (b) miniDo(b.dataset.mini); });
+      w.addEventListener('pagehide', () => { MINI_PIP = null; renderTimer(); });
+      miniWatch(); renderTimer();
+    }catch(e){ console.error('mini', e); toast('Ton navigateur n’a pas voulu ouvrir la petite fenêtre'); }
+  }
+}
+function miniClose(){
+  if (MINI_PIP){ try{ MINI_PIP.close(); }catch(e){} MINI_PIP = null; }
+  try{ localStorage.removeItem(MINI_ON); }catch(e){}
+  if (DESK){ try{ const TW = window.__TAURI__ || {}, C = TW.webviewWindow && TW.webviewWindow.WebviewWindow;
+    if (C) Promise.resolve(C.getByLabel('mini')).then(w => { if (w) w.close(); }).catch(() => {}); }catch(e){} }
+  if (miniTick){ clearInterval(miniTick); miniTick = 0; }
+  renderTimer();
+}
+/* le panneau : même balisage dans la fenêtre Tauri et dans la fenêtre flottante */
+function miniStyle(doc){
+  if (doc.getElementById('mini-css')) return;
+  [...document.querySelectorAll('style')].forEach(st => { const c = doc.createElement('style'); c.textContent = st.textContent; doc.head.appendChild(c); });
+  const m = doc.createElement('style'); m.id = 'mini-css'; m.textContent = 'body{margin:0}'; doc.head.appendChild(m);
+  const th = document.documentElement.getAttribute('data-theme'); if (th) doc.documentElement.setAttribute('data-theme', th);
+  doc.body.classList.add('mini-win');
+  const w = doc.createElement('div'); w.id = 'miniwrap'; doc.body.appendChild(w);
+}
+function miniDraw(doc, v){
+  const w = doc.getElementById('miniwrap'); if (!w) return;
+  if (v.dead){ if (w.dataset.sig === 'dead') return; w.dataset.sig = 'dead';
+    w.innerHTML = '<div class="mini-name">Planning prod est fermé</div><div class="mini-off">Rouvre l’application pour reprendre.</div>' +
+      '<div class="mini-btns"><button type="button" class="mini-next" data-mini="quit">Fermer cette fenêtre</button></div>'; return; }
+  if (v.off){ if (w.dataset.sig === 'off') return; w.dataset.sig = 'off';
+    w.innerHTML = '<div class="mini-name">Aucune session en cours</div><div class="mini-off">Lance une session dans Planning prod.</div>' +
+      '<div class="mini-btns"><button type="button" class="mini-next" data-mini="open">Ouvrir la fenêtre</button></div>'; return; }
+  const mm = Math.max(0, Math.round(v.t / 1000)), tm = String(Math.floor(mm / 60)).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0');
+  const pc = Math.max(0, Math.min(100, (1 - v.t / (v.min * 60000)) * 100));
+  const sig = tm + '|' + v.run + '|' + v.step + '|' + v.name + '|' + v.i + '|' + v.started;
+  if (w.dataset.sig !== sig){
+    w.dataset.sig = sig;
+    w.innerHTML = '<div class="mini-top"><span class="mini-time">' + tm + '</span><span class="mini-sub">' + (v.i + 1) + '/' + v.n + ' · ' + esc(v.step) + (v.started && !v.run ? ' · pause' : '') + '</span></div>' +
+      '<div class="mini-name">' + esc(v.name) + '</div>' +
+      '<div class="mini-bar"><i></i></div>' +
+      '<div class="mini-btns"><button type="button" class="mini-go" data-mini="toggle" title="' + (v.run ? 'Pause' : v.started ? 'Reprendre' : 'Démarrer') + '">' + (v.run ? I.pause : I.play) + '</button>' +
+      '<button type="button" class="mini-next" data-mini="next">Étape suivante</button>' +
+      '<button type="button" data-mini="open" title="Revenir à la grande fenêtre">Ouvrir</button></div>';
+  }
+  const b = w.querySelector('.mini-bar i'); if (b) b.style.width = pc.toFixed(1) + '%';
+}
+/* la petite fenêtre elle-même (index.html?mini=1) : elle n'affiche que le panneau et ne décide de rien */
+function miniBoot(){
+  document.body.classList.add('mini-win');
+  const wrap = document.getElementById('miniwrap'); wrap.hidden = false;
+  const send = c => { try{ localStorage.setItem(MINI_CMD, JSON.stringify({ c, at:Date.now() })); }catch(e){} };
+  wrap.addEventListener('click', ev => { const b = ev.target.closest('[data-mini]'); if (!b) return;
+    if (b.dataset.mini === 'open' || b.dataset.mini === 'quit'){ if (b.dataset.mini === 'open') send('open');
+      try{ localStorage.removeItem(MINI_ON); }catch(e){}
+      try{ if (window.__TAURI__) window.__TAURI__.window.getCurrentWindow().close(); }catch(e){} return; }
+    send(b.dataset.mini); });
+  const beat = () => { try{ localStorage.setItem(MINI_ON, String(Date.now())); }catch(e){}
+    let v = null; try{ v = JSON.parse(localStorage.getItem(MINI_BEAT) || 'null'); }catch(e){}
+    if (!v || v.at < Date.now() - 15000) v = { dead:1 }; else if (v.at < Date.now() - 8000) v = { off:1 };
+    if (v.th !== undefined && v.th !== null) document.documentElement.setAttribute('data-theme', v.th || '');
+    if (!v.off && v.run) v = Object.assign({}, v, { t: Math.max(0, v.t - (Date.now() - v.at)) }); /* décompte fluide entre deux battements */
+    miniDraw(document, v); };
+  beat(); setInterval(beat, 250);
+}
 function renderMinibar(){
   const mb = document.getElementById('minibar');
   if (!T || T.finished || !document.getElementById('timer').hidden){ mb.hidden = true; return; }
@@ -4964,6 +5107,7 @@ function renderTimer(){
   const s = cur();
   if (el.hidden){ renderMinibar(); return; }
   const head = '<div class="timer-head"><div class="timer-ctx">' + ctxLine(s) + '</div><div style="display:flex;gap:6px">' +
+    (miniCan() ? '<button class="icon-btn' + (miniOpenState() ? ' on' : '') + '" data-tc="mini" type="button" aria-label="' + (miniOpenState() ? 'Fermer le minuteur épinglé' : 'Épingler le minuteur') + '" title="' + (miniOpenState() ? 'Fermer la petite fenêtre' : 'Petite fenêtre toujours au-dessus des autres applications, pendant que tu produis') + '">' + I.pin + '</button>' : '') + /* étape 168 */
     '<button class="icon-btn fs-btn" data-fullscreen type="button" aria-label="Plein écran" title="Plein écran">' + fsIcon() + '</button>' +
     '<button class="icon-btn" data-tc="sound" type="button" aria-haspopup="menu" aria-expanded="' + !!document.querySelector('.snd-pop') + '" aria-label="Son des alertes" title="' + esc(sndTitle()) + '">' + (soundOn ? I.sound : I.mute) + '</button>' +
     /* rôles distincts : avant le lancement, un seul bouton « Fermer » ; une fois lancé, « Réduire » (le minuteur continue en bas de l'écran) et « Arrêter la session » (carré, avec choix de garder les minutes) */
@@ -5071,6 +5215,7 @@ function timerControl(tc){ timerControl0(tc);
     const f = tv.querySelector('[data-tc="' + tc + '"]') || tv.querySelector('.round[data-tc="toggle"], #start-btn'); if (f) try{ f.focus({ preventScroll:true }); }catch(e){} } }
 function timerControl0(tc){
   if (tc === 'toggle'){ if (T){ if (T.running) pause(); else resume(); } renderMinibar(); }
+  else if (tc === 'mini'){ if (miniOpenState()) miniClose(); else miniOpen(); }
   else if (tc === 'next') advance(false);
   else if (tc === 'prev') jumpTo(T.idx - 1);
   else if (tc === 'plus') addFive();
@@ -5557,7 +5702,7 @@ function autoSnap(force){
     VERS.a = list; versEcrire(); autoLastKey = k;
   }catch(e){ console.error('versions automatiques', e); }
 }
-setInterval(() => autoSnap(false), 60000);
+if (!MINI_WIN) setInterval(() => autoSnap(false), 60000); /* étape 168 : la petite fenêtre ne touche jamais aux données */
 setTimeout(() => autoSnap(true), 1500);
 function versionAt(minAgo){
   const limit = Date.now() - minAgo * 60000;
@@ -7125,7 +7270,10 @@ document.addEventListener('fullscreenchange', fsSync); document.addEventListener
 if (DESK) window.addEventListener('resize', () => { const w = deskWin(); if (w) w.isFullscreen().then(f => { if (f !== DESK_FS){ DESK_FS = f; fsSync(); } }).catch(() => {}); }); /* plein écran par le bouton vert de la fenêtre */
 /* bouton plein écran : vérifié quand le minuteur est reconstruit (pas à chaque seconde du chrono) */
 let fsRaf = 0; new MutationObserver(() => { if (fsRaf) return; fsRaf = requestAnimationFrame(() => { fsRaf = 0; const want = fsActive() ? 'Quitter le plein écran' : 'Plein écran'; if ([...document.querySelectorAll('.fs-btn')].some(b => b.getAttribute('aria-label') !== want)) fsSync(); }); }).observe(document.getElementById('timer'), { childList:true });
-{ const go = () => { bindClEditor(); bindCrEditor(); bindRkEditor(); bindSearch(); init(); fsSync(); maybeToday(); maybeOnboard(); }; if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else setTimeout(go); }
+{ const go = () => { if (MINI_WIN){ miniBoot(); return; } /* étape 168 : la petite fenêtre n'ouvre ni les données ni Drive : elle lit l'état de la grande */
+    bindClEditor(); bindCrEditor(); bindRkEditor(); bindSearch(); init(); fsSync(); maybeToday(); maybeOnboard();
+    if (miniAlive()) miniWatch(); /* étape 168 : la petite fenêtre était déjà ouverte (page rechargée) : on reprend l'envoi de l'état */
+    window.addEventListener('storage', ev => { if (ev.key === MINI_ON && miniAlive()) miniWatch(); }); }; if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else setTimeout(go); }
 /* ===== ÉCOUTE : fichiers audio (référence du morceau, exports de début et de fin) =====
  Fichiers gardés sur l'appareil (IndexedDB) ; les MP4/M4A de 20 Mo au plus sont aussi envoyés dans le stockage de l'artifact (synchro).
  Lecture : WAV 8/16/24/32 bits (entiers ou flottants), FLAC, MP3, MP4/M4A ; WAV lu par notre décodeur si le navigateur refuse.

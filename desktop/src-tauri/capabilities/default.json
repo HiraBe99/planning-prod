@@ -3,11 +3,18 @@
   "identifier": "default",
   "description": "Planning prod : ouvrir le navigateur pour Google, enregistrer les sauvegardes, parler à Google Drive",
   "windows": [
-    "main"
+    "main",
+    "mini"
   ],
   "permissions": [
     "core:default",
     "core:window:allow-set-fullscreen",
+    "core:window:allow-is-always-on-top",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-focus",
+    "core:window:allow-close",
+    "core:webview:allow-create-webview-window",
     "opener:default",
     {
       "identifier": "opener:allow-open-url",
