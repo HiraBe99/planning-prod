@@ -2049,7 +2049,7 @@ button.s-jour.s-jour--guess{ color:var(--text-dim); font-style:italic; }
           <button type="button" class="menu-item" id="open-rules" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="13" height="13" rx="2.5"/><path d="M7 10.2l2.2 2.2L13.3 8"/></svg></span><span class="mi-t"><b>Règles de session…</b><small>Rappels avant et après</small></span></button>
           <div class="menu-sep"></div>
           <div class="menu-h">Semaines</div>
-          <button type="button" class="menu-item" id="add-extra" role="menuitem" hidden><span class="mi-ic">+</span><span class="mi-t"><b>Session rapide…</b><small>Une session aujourd’hui, hors planning</small></span></button>
+          <button type="button" class="menu-item" id="add-extra" role="menuitem"><span class="mi-ic">+</span><span class="mi-t"><b>Ajouter une session…</b><small>Aujourd’hui, en plus de ce qui est prévu</small></span></button>
           <button type="button" class="menu-item" id="open-reserve" role="menuitem"><span class="mi-ic">+</span><span class="mi-t"><b>Joker…</b><small>Semaine de rattrapage</small></span></button>
           <div class="menu-sep"></div>
           <div class="menu-h">Planning</div>
@@ -3260,7 +3260,7 @@ applyTheme();
 /* ----- meters ----- */
 /* étape 163 : les sessions « + 1 » et « en plus » font partie du planning (elles reculent la fin du morceau) : comptées dans le total comme dans le fait ;
  une session rapide (ponctuelle, hors planning) ne compte ni dans l'un ni dans l'autre. Avant : le total les ignorait toutes, le fait les comptait toutes (barre > 100 % possible). */
-const horsPlanning = s => s.reserve || (s.extra && !s.prolong);
+const horsPlanning = s => s.reserve || (s.extra && !s.prolong && !s.famEdited); /* étape 169 : nommée comme une famille du morceau (elle en prend le numéro), elle compte dans ses heures */
 function totalsNow(modele){ const perBlock = {}; let totalHours = 0; ALL.forEach(s => { if (modele ? (s.extra || s.reserve) : horsPlanning(s)) return; perBlock[s.piste] = (perBlock[s.piste] || 0) + s.duree; totalHours += s.duree; }); return { perBlock, totalHours }; }
 function renderMeters(){
   const TN = totalsNow(); let done = 0; const per = {};
@@ -3843,15 +3843,22 @@ function renderPastBar(){ /* étape 63 : sur la ligne du filtre, à droite : un 
 }
 function renderExtraForm(){
   document.getElementById('extra-form').innerHTML =
-    '<div class="panel-head"><b>Nouvelle session rapide</b><button type="button" class="icon-btn" id="extra-close" aria-label="Fermer" title="Fermer"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></div>' +
+    '<div class="panel-head"><b>Ajouter une session</b><button type="button" class="icon-btn" id="extra-close" aria-label="Fermer" title="Fermer"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></div>' +
 
+    (() => { /* étape 169 : la nommer tout de suite (« bass ») la met dans la famille, avec son numéro : plus besoin de la renommer après coup */
+      const ns = nextSession(), fams = famsOfTrack((ns && ns.piste) || (BLOCKS.find(b => b !== 'Tampon') || ''));
+      return '<label class="f">Nom de la session<input type="text" id="x-nom" maxlength="30" placeholder="Bass, Kick… (vide : « Session rapide »)" autocomplete="off"></label>' +
+        (fams.length ? '<div class="quick-days x-fams">' + fams.map(f => '<button type="button" class="chip" data-xfam="' + esc(f) + '">' + esc(f) + '</button>').join('') + '</div>' : ''); })() +
     '<label class="f">Objectif<textarea rows="1" class="grow" id="x-obj" placeholder="Ce que tu veux avoir fait à la fin"></textarea></label>' +
     '<label class="f">Test de réussite<textarea rows="1" class="grow" id="x-test" placeholder="Comment savoir que c’est réussi"></textarea></label>' +
 
     '<div class="x-steps"><div class="x-steps-h">Déroulé de la session</div><div id="fc-0" class="xd">' + fdCard(0) + '</div></div>' +
     '<div class="edit-row"><button class="btn btn-primary" type="button" id="x-save">Créer la session</button><button class="btn" type="button" id="x-cancel">Annuler</button></div>' +
-    '<span class="help">Elle ne touche pas au planning.</span>';
+    '<span class="help">Elle ne décale rien. Nommée comme une famille du morceau, elle en prend le numéro et compte dans ses heures.</span>';
 }
+/* étape 169 : les familles de ce morceau (Bass, Kick, Arrangement…), dans l'ordre du programme */
+function famsOfTrack(p){ const out = []; ALL.forEach(s => { if (s.piste !== p || s.reserve || s.free || s.buffer || s.extra || !s.blocBase) return;
+  const k = nameKey(s.blocBase); if (!out.some(x => nameKey(x) === k)) out.push(s.blocBase); }); return out; }
 function xdSeed(id){ const f = fmtOf(id); fdHintOpen.clear(); FD = { extra:true, formats:[{ id:'xtra', label:'', steps: normSteps(f.steps).map(x => ({ name:x.name, min:x.min, role:x.role, cust:x.cust })) }], days:[] }; }
 /* ----- réserve de rattrapage : à planifier soi-même, quand on a pris du retard ou qu'on veut consolider ----- */
 function reserveGroups(){ const out = []; let lastTrack = '';
@@ -3889,7 +3896,9 @@ function createExtra(){
   const steps = (FD && FD.extra ? FD.formats[0].steps : []).map(x => { const nm = String(x.name || '').trim() || 'Étape'; return { name:nm, short:shortName(nm), min:Math.max(1, Math.round(+x.min || 1)), role:x.role, cust:(x.cust || '').trim() }; });
   const e = { id:'x' + Date.now().toString(36), date, fmt:fmts()[0].id, steps: steps.length ? steps : undefined,
     bloc:'', objectif:document.getElementById('x-obj').value, test:document.getElementById('x-test').value, essentiel:false };
-  meta.extras = extrasList().concat([e]); planLog('Session rapide ajoutée (' + dayShort(date) + ')' + (e.objectif.trim() ? ' : ' + e.objectif.trim() : '')); saveMeta(true);
+  { const nm = String((document.getElementById('x-nom') || {}).value || '').trim().slice(0, 30);
+    if (nm){ journal[e.id] = Object.assign({}, journal[e.id], { edit: Object.assign({}, (journal[e.id] || {}).edit, { bloc: nm }) }); saveJournal(e.id); writeLS(LS_J, journal); } } /* étape 169 */
+  meta.extras = extrasList().concat([e]); planLog('Session ajoutée (' + dayShort(date) + ')' + (e.objectif.trim() ? ' : ' + e.objectif.trim() : '')); saveMeta(true);
   closeExtraForm(); firstRender = true; renderAll();
   const s = BY_ID[e.id]; const c = document.querySelector('.week-card[data-week="' + s.week + '"]'); if (c){ c.open = true; ensureWeek(c); setWeekMode(s.week, 'semaine'); }
   const row = document.querySelector('.session-row[data-id="' + e.id + '"]');
@@ -6215,6 +6224,7 @@ function init(){
       { const dd = setDaysRead(); keepSlotFormats(dd); saveSettings(v, dd); } return; }
     if (ev.target.closest('#settings-close')){ document.getElementById('settings').hidden = true; return; }
     if (ev.target.closest('#extra-close') || ev.target.closest('#x-cancel')){ closeExtraForm(); return; }
+    { const fb = ev.target.closest('[data-xfam]'); if (fb){ const i = document.getElementById('x-nom'); if (i){ i.value = fb.dataset.xfam; i.focus(); } return; } }
     if (ev.target.closest('#x-save')){ createExtra(); return; }
     const xd = ev.target.closest('[data-xdel]'); if (xd){ deleteExtra(xd.dataset.xdel); return; }
     const xi = ev.target.closest('[data-insert]'); if (xi){ insertFrom(xi.dataset.insert); return; }
