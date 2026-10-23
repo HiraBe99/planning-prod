@@ -7200,12 +7200,16 @@ function sGroups(q){
   const G = [];
   const sess = []; ALL.forEach(s => { if (s.reserve) return; const fields = [s.bloc, s.objectif, s.test, s.jalon, s.compare].filter(Boolean);
     const f = fields.find(x => sHit(x, q)); if (!f) return;
-    sess.push({ t:esc(s.bloc) + ' · ' + esc(s.jourAbbr) + ' ' + esc(s.dateLabel), s:sSnip(f === s.bloc ? s.objectif : f, f === s.bloc ? '' : q), tag:pName(s.piste) + ' · S' + s.week, act:{ kind:'session', id:s.id } }); });
+    sess.push({ d:s.date || '', i:s.idx, t:esc(s.bloc) + ' · ' + esc(s.jourAbbr) + ' ' + esc(s.dateLabel), s:sSnip(f === s.bloc ? s.objectif : f, f === s.bloc ? '' : q), tag:pName(s.piste) + ' · S' + s.week, act:{ kind:'session', id:s.id } }); });
+  /* étape 170 : dans l'ordre du calendrier. Les sessions ajoutées (« + 1 », session du jour) viennent après tout le programme dans ALL :
+     sans ce tri, elles se retrouvaient tout en bas des résultats, après les autres morceaux, et semblaient manquer. */
+  sess.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : a.i - b.i));
   if (sess.length) G.push({ h:'Sessions', items:sess });
   const jr = []; [...new Set(Object.keys(journal).concat(Object.keys(progress)))].forEach(id => { const s = BY_ID[id]; if (!s) return; const j = journal[id] || {}, p = getPlan(id);
     const fields = [['But', p.titre], ['Étape', p.etapes.join(' · ')], ['Critères', p.criteres.join(' · ')], ['Problème', j.probleme], ['Prochaine action', j.prochaine], ['Écart', j.ecart], ['Notes', (progress[id] || {}).notes || j.notes], ['À travailler', p.mots.join(', ')]]; /* étape 84 : les notes libres sont dans la progression */
     const f = fields.find(x => x[1] && sHit(x[1], q)); if (!f) return;
-    jr.push({ t:f[0] + ' · ' + esc(s.bloc) + ' · ' + esc(s.jourAbbr) + ' ' + esc(s.dateLabel), s:sSnip(f[1], q), tag:pName(s.piste) + ' · S' + s.week, act:{ kind:'journal', id } }); });
+    jr.push({ d:s.date || '', i:s.idx, t:f[0] + ' · ' + esc(s.bloc) + ' · ' + esc(s.jourAbbr) + ' ' + esc(s.dateLabel), s:sSnip(f[1], q), tag:pName(s.piste) + ' · S' + s.week, act:{ kind:'journal', id } }); });
+  jr.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : a.i - b.i));
   if (jr.length) G.push({ h:'Plans et journal', items:jr });
   const su = [];
   rkItems().forEach(t => { if (sHit(t, q)) su.push({ t:'Élément noté de 1 à 5', s:sSnip(t, q), act:{ kind:'suivi', el:'#prog-sess' } }); });
