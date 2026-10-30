@@ -9579,15 +9579,16 @@ function encNeeds(aid){ const it = auItem(aid); return !!(it && !it.memo && !ass
 function encQueue(aid){ if (!encNeeds(aid) || ENC.q.includes(aid) || (ENC.busy && ENC.busy.aid === aid)) return; ENC.q.push(aid); encRun(); }
 async function encRun(){ if (ENC.busy || !ENC.q.length) return; const aid = ENC.q.shift(); if (!encNeeds(aid)){ encRun(); return; } ENC.busy = { aid, p:0 }; encPaint(aid);
   try{ const as = await auAssets(); if (!as){ ENC.done[aid] = 'off'; return; }
-    if (as === gdAssets){ const it0 = auItem(aid), rec = await auGetRec(aid), orig = rec && rec.blob; if (!it0 || !orig){ ENC.done[aid] = 'nofile'; return; } /* étape 139 : Drive : l'original, au bit près */
+    if (as === gdAssets){ const it0 = auItem(aid), rec = await auGetRec(aid), orig = rec && rec.blob; if (!it0 || !orig){ ENC.done[aid] = 'nofile'; return; } /* étape 139 : Drive : l'original, au bit près ; étape 178 : seulement s'il est léger, sinon copie AAC (un WAV pèse 500 Mo et plus) */
+      if (orig.size <= ORIG_MAX){
       ENC.busy.p = 0.3; encPaint(aid); const r = await as.upload(new File([orig], it0.n || 'son', { type:orig.type || 'application/octet-stream' }), { type:orig.type || 'application/octet-stream' }); const it2 = auItem(aid);
-      if (it2 && r && r.id){ it2.asset = r.id; it2.assetOrig = 1; it2.assetRaw = 1; delete it2.assetCopy; delete it2.assetKb; saveMeta(); ENC.done[aid] = 'ok'; } else ENC.done[aid] = 'fail'; return; }
+      if (it2 && r && r.id){ it2.asset = r.id; it2.assetOrig = 1; it2.assetRaw = 1; delete it2.assetCopy; delete it2.assetKb; saveMeta(); ENC.done[aid] = 'ok'; } else ENC.done[aid] = 'fail'; return; } }
     { const it0 = auItem(aid), rec = await auGetRec(aid), orig = rec && rec.blob; /* étape 132 : l'original d'abord, s'il tient */
       if (it0 && orig && orig.size <= ORIG_MAX){ ENC.busy.p = 0.3; encPaint(aid); const r = await as.upload(new Blob([await blobB64(orig)], { type:'text/plain' }), { type:'text/plain' }); const it2 = auItem(aid);
         if (it2 && r && r.id){ it2.asset = r.id; it2.assetOrig = 1; delete it2.assetCopy; delete it2.assetKb; saveMeta(); ENC.done[aid] = 'ok'; } else ENC.done[aid] = 'fail'; return; } }
     const buf = await auBuffer(aid); if (!buf){ ENC.done[aid] = 'nofile'; return; }
     const onp = p => { ENC.busy.p = p; encPaint(aid); }; let out = await encAacWc(buf, onp); if (!out) out = await encRec(buf, onp); const blob = out && out.blob; if (!blob){ ENC.done[aid] = 'noenc'; toast('Ce navigateur ne sait pas compresser l’audio : la copie pour les autres appareils n’a pas pu être faite'); return; }
-    if (blob.size > 20 * 1024 * 1024){ ENC.done[aid] = 'big'; return; } const it = auItem(aid); if (!it) return; const nm = (it.n || 'morceau').replace(/\.[^.]+$/, '') + (blob.type === 'video/webm' ? '.webm' : '.mp4');
+    if (blob.size > 20 * 1024 * 1024 && as !== gdAssets){ ENC.done[aid] = 'big'; return; } const it = auItem(aid); if (!it) return; const nm = (it.n || 'morceau').replace(/\.[^.]+$/, '') + (blob.type === 'video/webm' ? '.webm' : '.mp4');
     const r = await as.upload(new File([blob], nm, { type:blob.type }), { type:blob.type }); const it2 = auItem(aid); if (it2 && r && r.id){ it2.asset = r.id; it2.assetCopy = out.codec; it2.assetKb = ENC.kbps; saveMeta(); ENC.done[aid] = 'ok'; } else ENC.done[aid] = 'fail'; }
   catch(e){ if (e && (e.code === 'auth' || e.code === 'offline')) delete ENC.done[aid]; else { console.error('copie compressée', e); ENC.done[aid] = 'fail'; } }
   finally { ENC.busy = null; encPaint(aid); Object.keys(AU.st).forEach(auRenderAll); if (document.getElementById('libovl')) libRender(); encRun(); } }
