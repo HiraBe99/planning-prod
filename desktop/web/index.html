@@ -728,12 +728,13 @@ body.mini-win > *:not(#miniwrap){ display:none !important; }
 #miniwrap{ position:fixed; inset:0; display:flex; flex-direction:column; gap:6px; padding:10px 12px 12px; background:var(--bg); color:var(--text); user-select:none; -webkit-user-select:none; }
 .mini-top{ display:flex; align-items:baseline; gap:8px; min-width:0; }
 .mini-time{ font-family:var(--font-mono); font-size:30px; font-weight:700; line-height:1; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
-.mini-sub{ font-size:12px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; text-align:right; }
-.mini-name{ font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mini-sub{ font-size:12px; line-height:1.25; color:var(--text-dim); white-space:normal; overflow-wrap:anywhere; min-width:0; flex:1; text-align:right; } /* étape 171 : le texte passe à la ligne, plus de « … » */
+.mini-name{ font-size:13px; font-weight:600; line-height:1.25; white-space:normal; overflow-wrap:anywhere; }
+#miniwrap{ overflow-y:auto; scrollbar-width:none; } #miniwrap::-webkit-scrollbar{ display:none; }
 .mini-bar{ height:4px; border-radius:2px; background:var(--field); overflow:hidden; }
 .mini-bar i{ display:block; height:100%; background:var(--accent); width:0; transition:width .3s linear; }
 .mini-btns{ display:flex; gap:6px; margin-top:auto; }
-.mini-btns button{ appearance:none; border:1px solid var(--frame-f, var(--field-border)); background:var(--field); color:var(--text); font:inherit; font-size:12px; font-weight:600; height:34px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:0 10px; }
+.mini-btns button{ white-space:nowrap; appearance:none; border:1px solid var(--frame-f, var(--field-border)); background:var(--field); color:var(--text); font:inherit; font-size:12px; font-weight:600; height:34px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:0 10px; }
 .mini-btns button:hover{ filter:brightness(1.07); }
 .mini-btns .mini-go{ flex:0 0 46px; background:var(--accent); color:var(--on-accent); border-color:transparent; }
 .mini-btns .mini-next{ flex:1 1 auto; }
@@ -4986,7 +4987,7 @@ function miniPoll(){
   try{ const c = JSON.parse(localStorage.getItem(MINI_CMD) || 'null');
     if (c && c.at > miniCmdAt){ miniCmdAt = c.at; miniDo(c.c); } }catch(e){}
   miniPush();
-  if (!miniOpenState() && !MINI_PIP){ clearInterval(miniTick); miniTick = 0; renderTimer(); }
+  if (!miniOpenState() && !MINI_PIP){ clearInterval(miniTick); miniTick = 0; renderTimer(); miniUnfold(); }
 }
 function miniDo(c){
   if (c === 'toggle'){ if (T) timerControl('toggle'); }
@@ -4996,15 +4997,19 @@ function miniDo(c){
 function miniWatch(){ if (miniTick) return; miniTick = setInterval(miniPoll, 300); miniPush(); }
 /* ouverture */
 async function miniOpen(){
-  if (MINI_WIN) return;
+  if (MINI_WIN || miniOpen.busy) return; miniOpen.busy = true;
+  try{ await miniOpen0(); } finally { miniOpen.busy = false; }
+}
+async function miniOpen0(){
   if (DESK){
     try{
       const TW = window.__TAURI__ || {}, Ctor = TW.webviewWindow && TW.webviewWindow.WebviewWindow;
       if (!Ctor) throw new Error('fenêtre indisponible');
-      try{ const old = await Ctor.getByLabel('mini'); if (old) await old.close(); }catch(e){}
-      const w = new Ctor('mini', { url:'index.html?mini=1', title:'Minuteur', width:300, height:148, minWidth:240, minHeight:120,
-        alwaysOnTop:true, resizable:true, skipTaskbar:false, focus:true });
+      try{ const old = await Ctor.getByLabel('mini'); if (old){ await old.close(); for (let k = 0; k < 20 && await Ctor.getByLabel('mini'); k++) await new Promise(r => setTimeout(r, 50)); } }catch(e){} /* étape 171 : on attend que l'ancienne soit vraiment partie */
+      const w = new Ctor('mini', { url:'index.html?mini=1', title:'Minuteur', width:300, height:160, minWidth:280, minHeight:150,
+        alwaysOnTop:true, resizable:true, skipTaskbar:false, focus:true, acceptFirstMouse:true }); /* étape 171 : Mac : le 1er clic sur la fenêtre non active compte aussi */
       await new Promise((ok, no) => { w.once('tauri://created', ok); w.once('tauri://error', e => no(e)); setTimeout(ok, 1500); });
+      miniFold();
       try{ await w.setAlwaysOnTop(true); }catch(e){ console.error('au-dessus', e); } /* à la création, l'option n'est pas toujours prise : on la repose */
       try{ localStorage.setItem(MINI_ON, String(Date.now())); }catch(e){}
       miniWatch(); renderTimer(); toast('Minuteur épinglé : la petite fenêtre reste au-dessus');
@@ -5012,21 +5017,38 @@ async function miniOpen(){
     return; }
   if (window.documentPictureInPicture){
     try{
-      const w = await documentPictureInPicture.requestWindow({ width:300, height:150 });
-      MINI_PIP = w; miniStyle(w.document); miniDraw(w.document, miniState());
+      const w = await documentPictureInPicture.requestWindow({ width:300, height:160 });
+      MINI_PIP = w; miniFold(); miniStyle(w.document); miniDraw(w.document, miniState());
       w.document.body.addEventListener('click', ev => { const b = ev.target.closest && ev.target.closest('[data-mini]'); if (b) miniDo(b.dataset.mini); });
-      w.addEventListener('pagehide', () => { MINI_PIP = null; renderTimer(); });
+      w.addEventListener('pagehide', () => { MINI_PIP = null; renderTimer(); miniUnfold(); });
       miniWatch(); renderTimer();
     }catch(e){ console.error('mini', e); toast('Ton navigateur n’a pas voulu ouvrir la petite fenêtre'); }
   }
 }
+/* étape 171 : épingler / fermer se décide d'après la vraie fenêtre. Avant : d'après le dernier signe de vie (gardé 6 s), donc après une fermeture à la croix le 1er clic « fermait » au lieu d'ouvrir */
+async function miniToggle(){
+  if (miniToggle.busy) return; miniToggle.busy = true;
+  try{
+    let open = !!MINI_PIP;
+    if (DESK){ try{ const TW = window.__TAURI__ || {}, C = TW.webviewWindow && TW.webviewWindow.WebviewWindow; open = !!(C && await C.getByLabel('mini')); }catch(e){ open = miniAlive(); } }
+    if (open) miniClose(); else await miniOpen();
+  } finally { miniToggle.busy = false; }
+}
+/* étape 171 : la petite fenêtre s'ouvre → la grande se replie ; la petite se ferme (bouton, croix ou « Ouvrir ») → la grande revient, avec le minuteur */
+let miniFolded = false;
+function miniFold(){ miniFolded = true;
+  if (DESK){ try{ window.__TAURI__.window.getCurrentWindow().minimize(); }catch(e){ console.error('replier', e); } }
+  else if (T && !T.finished && !document.getElementById('timer').hidden) closeTimer(); }
+function miniUnfold(){ if (!miniFolded) return; miniFolded = false;
+  if (DESK){ try{ const w = window.__TAURI__.window.getCurrentWindow(); Promise.resolve(w.unminimize()).then(() => w.setFocus()).catch(() => {}); }catch(e){ console.error('revenir', e); } }
+  if (T && !T.finished && document.getElementById('timer').hidden) openTimer(); }
 function miniClose(){
   if (MINI_PIP){ try{ MINI_PIP.close(); }catch(e){} MINI_PIP = null; }
   try{ localStorage.removeItem(MINI_ON); }catch(e){}
   if (DESK){ try{ const TW = window.__TAURI__ || {}, C = TW.webviewWindow && TW.webviewWindow.WebviewWindow;
     if (C) Promise.resolve(C.getByLabel('mini')).then(w => { if (w) w.close(); }).catch(() => {}); }catch(e){} }
   if (miniTick){ clearInterval(miniTick); miniTick = 0; }
-  renderTimer();
+  renderTimer(); miniUnfold();
 }
 /* le panneau : même balisage dans la fenêtre Tauri et dans la fenêtre flottante */
 function miniStyle(doc){
@@ -5075,6 +5097,7 @@ function miniBoot(){
     if (v.th !== undefined && v.th !== null) document.documentElement.setAttribute('data-theme', v.th || '');
     if (!v.off && v.run) v = Object.assign({}, v, { t: Math.max(0, v.t - (Date.now() - v.at)) }); /* décompte fluide entre deux battements */
     miniDraw(document, v); };
+  window.addEventListener('pagehide', () => { try{ localStorage.removeItem(MINI_ON); }catch(e){} }); /* étape 171 */
   beat(); setInterval(beat, 250);
 }
 function renderMinibar(){
@@ -5224,7 +5247,7 @@ function timerControl(tc){ timerControl0(tc);
     const f = tv.querySelector('[data-tc="' + tc + '"]') || tv.querySelector('.round[data-tc="toggle"], #start-btn'); if (f) try{ f.focus({ preventScroll:true }); }catch(e){} } }
 function timerControl0(tc){
   if (tc === 'toggle'){ if (T){ if (T.running) pause(); else resume(); } renderMinibar(); }
-  else if (tc === 'mini'){ if (miniOpenState()) miniClose(); else miniOpen(); }
+  else if (tc === 'mini') miniToggle();
   else if (tc === 'next') advance(false);
   else if (tc === 'prev') jumpTo(T.idx - 1);
   else if (tc === 'plus') addFive();
