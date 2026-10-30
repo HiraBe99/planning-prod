@@ -734,10 +734,12 @@ body.mini-win > *:not(#miniwrap){ display:none !important; }
 .mini-bar{ height:4px; border-radius:2px; background:var(--field); overflow:hidden; }
 .mini-bar i{ display:block; height:100%; background:var(--accent); width:0; transition:width .3s linear; }
 .mini-btns{ display:flex; gap:6px; margin-top:auto; }
-.mini-btns button{ white-space:nowrap; appearance:none; border:1px solid var(--frame-f, var(--field-border)); background:var(--field); color:var(--text); font:inherit; font-size:12px; font-weight:600; height:34px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:0 10px; }
+.mini-btns button{ white-space:nowrap; appearance:none; border:1px solid var(--frame-f, var(--field-border)); background:var(--field); color:var(--text); font:inherit; font-size:12px; font-weight:600; height:34px; width:34px; flex:0 0 34px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:0; }
 .mini-btns button:hover{ filter:brightness(1.07); }
-.mini-btns .mini-go{ flex:0 0 46px; background:var(--accent); color:var(--on-accent); border-color:transparent; }
-.mini-btns .mini-next{ flex:1 1 auto; }
+.mini-btns .mini-go{ background:var(--accent); color:var(--on-accent); border-color:transparent; }
+.mini-btns .mini-wide{ flex:1 1 auto; width:auto; padding:0 10px; } /* états « fermé » et « aucune session » */
+.mini-btns .mini-open{ margin-left:auto; } /* étape 177 : 5 boutons carrés identiques : précédent, zéro, lecture, suivant, ouvrir */
+.mini-btns button:disabled{ opacity:.4; cursor:default; filter:none; }
 .mini-btns svg{ width:14px; height:14px; }
 .mini-off{ font-size:12px; color:var(--text-dim); }
 .minibar{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom,0px) + var(--s-4)); z-index:40; display:flex; align-items:center; gap:var(--s-3);
@@ -4898,7 +4900,15 @@ function askDialog(title, text, buttons){
 document.getElementById('dialog').addEventListener('wheel', ev => { const b = ev.target.closest('.dlg-box'); if (!b || b.scrollHeight <= b.clientHeight + 1) ev.preventDefault(); }, { passive:false });
 document.querySelectorAll('.povl').forEach(o => o.addEventListener('wheel', ev => { if (ev.ctrlKey || ev.target.closest('.povl-scroll')) return; const sc = o.querySelector('.povl-scroll'); if (!sc) return;
   ev.preventDefault(); const k = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? sc.clientHeight : 1; sc.scrollBy(ev.deltaX * k, ev.deltaY * k); }, { passive:false }));
-async function resetTimer(){
+/* étape 177 : « remettre à zéro » ne touche plus que le bloc en cours (il repart de sa durée complète) ; la session, les blocs faits et le temps travaillé restent. Pas de fenêtre de confirmation : la petite fenêtre l'utilise aussi. */
+function resetTimer(){
+  if (!T || T.finished) return;
+  const st = T.steps[T.idx]; T.remaining = st.min * 60000; T.warned = false;
+  if (T.running){ T.endsAt = Date.now() + T.remaining; T.lastTs = Date.now(); }
+  if (T.jp && T.remaining + T.steps.slice(T.idx + 1).reduce((a, x) => a + x.min * 60000, 0) > 300000) T.jp = false;
+  persistTimer(); renderTimer(); renderMinibar(); try{ updateClock(); }catch(e){}
+}
+async function resetSession(){ /* l'ancienne remise à zéro de toute la session (plus reliée à un bouton) */
   if (!T || T.finished) return;
   const mins = Math.round(T.active / 60000);
   const v = await askDialog('Remettre le minuteur à zéro ?', (mins > 0 ? mins + ' min travaillées ne seront pas comptées. ' : '') + 'La session repart de la première étape ; ton but, ton plan et tes cases cochées sont conservés.', [
@@ -4994,6 +5004,8 @@ function miniPoll(){
 function miniDo(c){
   if (c === 'toggle'){ if (T) timerControl('toggle'); }
   else if (c === 'next'){ if (T && !T.finished) timerControl('next'); }
+  else if (c === 'prev'){ if (T && !T.finished && T.idx > 0) timerControl('prev'); }
+  else if (c === 'reset'){ if (T && !T.finished) timerControl('reset'); } /* étape 177 */
   else if (c === 'open'){ miniClose(); openTimer(); try{ if (DESK && window.__TAURI__ && window.__TAURI__.window) window.__TAURI__.window.getCurrentWindow().setFocus(); }catch(e){} }
 }
 function miniWatch(){ if (miniTick) return; miniTick = setInterval(miniPoll, 300); miniPush(); }
@@ -5070,10 +5082,10 @@ function miniDraw(doc, v){
   const w = doc.getElementById('miniwrap'); if (!w) return;
   if (v.dead){ if (w.dataset.sig === 'dead') return; w.dataset.sig = 'dead';
     w.innerHTML = '<div class="mini-name">Planning prod est fermé</div><div class="mini-off">Rouvre l’application pour reprendre.</div>' +
-      '<div class="mini-btns"><button type="button" class="mini-next" data-mini="quit">Fermer cette fenêtre</button></div>'; return; }
+      '<div class="mini-btns"><button type="button" class="mini-wide" data-mini="quit">Fermer cette fenêtre</button></div>'; return; }
   if (v.off){ if (w.dataset.sig === 'off') return; w.dataset.sig = 'off';
     w.innerHTML = '<div class="mini-name">Aucune session en cours</div><div class="mini-off">Lance une session dans Planning prod.</div>' +
-      '<div class="mini-btns"><button type="button" class="mini-next" data-mini="open">Ouvrir la fenêtre</button></div>'; return; }
+      '<div class="mini-btns"><button type="button" class="mini-wide" data-mini="open">Ouvrir la fenêtre</button></div>'; return; }
   const mm = Math.max(0, Math.round(v.t / 1000)), tm = String(Math.floor(mm / 60)).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0');
   const pc = Math.max(0, Math.min(100, (1 - v.t / (v.min * 60000)) * 100));
   const sig = tm + '|' + v.run + '|' + v.step + '|' + v.name + '|' + v.i + '|' + v.started;
@@ -5082,9 +5094,12 @@ function miniDraw(doc, v){
     w.innerHTML = '<div class="mini-top"><span class="mini-time">' + tm + '</span><span class="mini-sub">' + (v.i + 1) + '/' + v.n + ' · ' + esc(v.step) + (v.started && !v.run ? ' · pause' : '') + '</span></div>' +
       '<div class="mini-name">' + esc(v.name) + '</div>' +
       '<div class="mini-bar"><i></i></div>' +
-      '<div class="mini-btns"><button type="button" class="mini-go" data-mini="toggle" title="' + (v.run ? 'Pause' : v.started ? 'Reprendre' : 'Démarrer') + '">' + (v.run ? I.pause : I.play) + '</button>' +
-      '<button type="button" class="mini-next" data-mini="next">Étape suivante</button>' +
-      '<button type="button" data-mini="open" title="Revenir à la grande fenêtre">Ouvrir</button></div>';
+      '<div class="mini-btns">' +
+      '<button type="button" data-mini="prev" title="Relancer le bloc précédent" aria-label="Relancer le bloc précédent"' + (v.i > 0 ? '' : ' disabled') + '><svg viewBox="0 0 20 20" fill="currentColor"><path d="M16 4.5v11L8 10z"/><path d="M4 4.5h2.2v11H4z"/></svg></button>' +
+      '<button type="button" data-mini="reset" title="Remettre ce bloc à zéro" aria-label="Remettre ce bloc à zéro">' + I.reset + '</button>' +
+      '<button type="button" class="mini-go" data-mini="toggle" title="' + (v.run ? 'Pause' : v.started ? 'Reprendre' : 'Démarrer') + '" aria-label="' + (v.run ? 'Pause' : v.started ? 'Reprendre' : 'Démarrer') + '">' + (v.run ? I.pause : I.play) + '</button>' +
+      '<button type="button" data-mini="next" title="Bloc suivant" aria-label="Bloc suivant"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M4 4.5v11L12 10z"/><path d="M13.8 4.5H16v11h-2.2z"/></svg></button>' +
+      '<button type="button" class="mini-open" data-mini="open" title="Revenir à la grande fenêtre" aria-label="Revenir à la grande fenêtre"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4h4v4M16 4l-6 6M8.5 5H5.5A1.5 1.5 0 0 0 4 6.5v8A1.5 1.5 0 0 0 5.5 16h8a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg></button></div>';
   }
   const b = w.querySelector('.mini-bar i'); if (b) b.style.width = pc.toFixed(1) + '%';
 }
@@ -5221,7 +5236,7 @@ function renderTimer(){
       '<div class="next-up">' + (nxt ? 'Ensuite : ' + esc(nxt.name) + ' · ' + nxt.min + ' min' : (s.free ? 'Dernière portion' : 'Dernière étape : bilan à la fin')) + '</div>' +
       /* « Relancer [étape précédente] » : discret, à côté de « Remettre à zéro » ; pour tout type de session dès la 2e étape */
       '<div class="t-links">' + (T.idx > 0 ? (() => { const pv = T.steps[T.idx - 1]; return '<button type="button" class="text-btn t-reset" data-tc="prev" title="Relancer « ' + esc(pv.name) + ' » (' + pv.min + ' min)" aria-label="Relancer ' + esc(pv.name) + '"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5"/></svg></button>'; })() : '') +
-      '<button type="button" class="text-btn t-reset" data-tc="reset" aria-label="Remettre à zéro" title="Remettre à zéro">' + I.reset + '</button>' +
+      '<button type="button" class="text-btn t-reset" data-tc="reset" aria-label="Remettre ce bloc à zéro" title="Remettre ce bloc à zéro">' + I.reset + '</button>' +
       '<button type="button" class="text-btn t-reset t-hold" data-tc="hold" aria-pressed="' + holdOn() + '" aria-label="Pause à chaque bloc" title="' + (holdOn() ? 'Le minuteur s’arrête à la fin de chaque bloc (cliquer pour laisser défiler)' : 'Le temps défile d’un bloc à l’autre (cliquer pour s’arrêter à chaque bloc)') + '">' + '<svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 10h7"/><path d="M7.5 6.5L11 10l-3.5 3.5"/><path d="M15 4v12"/></svg></button></div>' + bloque +
     '</div>' +
     /* consigne de l'étape (étape 104) : sous la carte, dans un bloc à elle, pour que la carte garde la même hauteur à toutes les étapes ; seulement s'il y a quelque chose à dire (aucune à l'Objectif) */
