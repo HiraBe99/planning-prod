@@ -2069,6 +2069,8 @@ button.s-jour.s-jour--guess{ color:var(--text-dim); font-style:italic; }
           <div class="menu-h">Données</div>
           <button type="button" class="menu-item danger" id="reset-all" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg></span><span class="mi-t"><b>Vider le planning…</b><small>Garde la structure, efface textes et progression</small></span></button>
           <button type="button" class="menu-item danger" id="reset-everything" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10a6 6 0 1 0 1.8-4.3"/><path d="M4 3.5v3h3"/></svg></span><span class="mi-t"><b>Revenir au modèle d’origine…</b><small>Tout le projet d’exemple, progression effacée</small></span></button>
+          <div id="menu-quit-wrap" hidden><div class="menu-sep"></div>
+          <button type="button" class="menu-item" id="menu-quit" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v6.5M5.8 5.8a6 6 0 1 0 8.4 0"/></svg></span><span class="mi-t"><b>Quitter l’application</b></span></button></div>
         </div>
     </div>
     <div class="meter-bridge">
@@ -6242,6 +6244,7 @@ function init(){
     if (ev.target.closest('#open-project')){ openProject(); return; }
     if (ev.target.closest('#open-formats') || ev.target.closest('#fmt-edit')){ openFormats(); return; }
     if (ev.target.closest('#open-rules') || ev.target.closest('#rules-edit')){ openRules(); return; }
+    if (ev.target.closest('#menu-quit')){ quitApp(); return; } /* étape 175 */
     if (ev.target.closest('#menu-backup')){ exportBackup(); return; }
     if (ev.target.closest('#menu-backup-sons')){ exportWithSounds(); return; }
     if (ev.target.closest('#menu-drive')){ gdMenuClick(); return; }
@@ -7294,6 +7297,10 @@ function bindSearch(){
     else if (ev.key === 'Escape' && !document.getElementById('searchovl').hidden){ closeSearch(); }
   });
 }
+/* étape 175 : quitter vraiment l'app de bureau (la croix réduit la fenêtre pendant une session ou la petite fenêtre) : menu ⋯ « Quitter l'application » ou Ctrl + Q ; Mac : Cmd + Q */
+function quitApp(){ try{ flushSaves(); }catch(e){} try{ miniClose(); }catch(e){}
+  setTimeout(() => { try{ window.__TAURI__.core.invoke('quit_app'); }catch(e){ try{ window.__TAURI__.window.getCurrentWindow().destroy(); }catch(x){} } }, 350); }
+document.addEventListener('keydown', e => { if (DESK && !MINI_WIN && e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && String(e.key).toLowerCase() === 'q'){ e.preventDefault(); quitApp(); } });
 /* ----- plein écran ----- */
 const FS_ON = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5v-4h4M12.5 3.5h4v4M16.5 12.5v4h-4M7.5 16.5h-4v-4"/></svg>';
 const FS_OFF = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 3.5v4h-4M16.5 7.5h-4v-4M12.5 16.5v-4h4M3.5 12.5h4v4"/></svg>';
@@ -7317,7 +7324,7 @@ if (DESK) window.addEventListener('resize', () => { const w = deskWin(); if (w) 
 let fsRaf = 0; new MutationObserver(() => { if (fsRaf) return; fsRaf = requestAnimationFrame(() => { fsRaf = 0; const want = fsActive() ? 'Quitter le plein écran' : 'Plein écran'; if ([...document.querySelectorAll('.fs-btn')].some(b => b.getAttribute('aria-label') !== want)) fsSync(); }); }).observe(document.getElementById('timer'), { childList:true });
 { const go = () => { if (MINI_WIN){ miniBoot(); return; } /* étape 168 : la petite fenêtre n'ouvre ni les données ni Drive : elle lit l'état de la grande */
     bindClEditor(); bindCrEditor(); bindRkEditor(); bindSearch(); init(); fsSync(); maybeToday(); maybeOnboard();
-    if (DESK && !MINI_WIN){ try{ const W0 = window.__TAURI__.window.getCurrentWindow(); /* étape 173 : la croix de la grande fenêtre la réduit (l'app continue de tourner) tant qu'une session ou la petite fenêtre est ouverte ; sinon elle ferme l'app comme avant */
+    if (DESK && !MINI_WIN){ try{ const qw = document.getElementById('menu-quit-wrap'); if (qw) qw.hidden = false; const W0 = window.__TAURI__.window.getCurrentWindow(); /* étape 173 : la croix de la grande fenêtre la réduit (l'app continue de tourner) tant qu'une session ou la petite fenêtre est ouverte ; sinon elle ferme l'app comme avant */
       W0.onCloseRequested(ev => { if ((T && !T.finished) || miniOpenState()){ ev.preventDefault(); try{ W0.minimize(); }catch(e){} } }); }catch(e){ console.error('croix', e); } }
     if (miniAlive()) miniWatch(); /* étape 168 : la petite fenêtre était déjà ouverte (page rechargée) : on reprend l'envoi de l'état */
     window.addEventListener('storage', ev => { if (ev.key === MINI_ON && miniAlive()) miniWatch(); }); }; if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else setTimeout(go); }

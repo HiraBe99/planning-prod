@@ -49,6 +49,12 @@ async fn drive_put(request: tauri::ipc::Request<'_>) -> Result<serde_json::Value
     Ok(serde_json::json!({ "status": status, "body": text }))
 }
 
+/// Quitte vraiment l'app (la croix de la grande fenêtre la réduit seulement pendant une session ou la petite fenêtre).
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
 /// Écran allumé pendant une session (Mac : « caffeinate », tant que l'app tourne) ; ailleurs : rien.
 static AWAKE: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mutex::new(None);
 #[tauri::command]
@@ -84,7 +90,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![oauth_listen, drive_put, keep_awake])
+        .invoke_handler(tauri::generate_handler![oauth_listen, drive_put, keep_awake, quit_app])
         .run(tauri::generate_context!())
         .expect("Planning prod n'a pas pu démarrer");
 }
