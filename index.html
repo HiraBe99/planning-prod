@@ -725,7 +725,7 @@ table.t{ width:100%; border-collapse:collapse; font-size:var(--fs-3); }
 /* ===== étape 168 : minuteur épinglé (petite fenêtre toujours au-dessus) ===== */
 body.mini-win{ overflow:hidden; background:var(--bg); }
 body.mini-win > *:not(#miniwrap){ display:none !important; }
-#miniwrap{ position:fixed; inset:0; display:flex; flex-direction:column; gap:6px; padding:10px 12px 12px; background:var(--bg); color:var(--text); user-select:none; -webkit-user-select:none; }
+#miniwrap{ position:fixed; inset:0; display:flex; flex-direction:column; gap:5px; padding:8px 12px 10px; background:var(--bg); color:var(--text); user-select:none; -webkit-user-select:none; }
 .mini-top{ display:flex; align-items:baseline; gap:8px; min-width:0; }
 .mini-time{ font-family:var(--font-mono); font-size:30px; font-weight:700; line-height:1; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
 .mini-sub{ font-size:12px; line-height:1.25; color:var(--text-dim); white-space:normal; overflow-wrap:anywhere; min-width:0; flex:1; text-align:right; } /* étape 171 : le texte passe à la ligne, plus de « … » */
@@ -733,7 +733,7 @@ body.mini-win > *:not(#miniwrap){ display:none !important; }
 #miniwrap{ overflow-y:auto; scrollbar-width:none; } #miniwrap::-webkit-scrollbar{ display:none; }
 .mini-bar{ height:4px; border-radius:2px; background:var(--field); overflow:hidden; }
 .mini-bar i{ display:block; height:100%; background:var(--accent); width:0; transition:width .3s linear; }
-.mini-btns{ display:flex; gap:6px; margin-top:auto; }
+.mini-btns{ display:flex; gap:6px; margin-top:auto; padding-top:4px; }
 .mini-btns button{ white-space:nowrap; appearance:none; border:1px solid var(--frame-f, var(--field-border)); background:var(--field); color:var(--text); font:inherit; font-size:12px; font-weight:600; height:34px; width:34px; flex:0 0 34px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:0; }
 .mini-btns button:hover{ filter:brightness(1.07); }
 .mini-btns .mini-go{ background:var(--accent); color:var(--on-accent); border-color:transparent; }
@@ -2043,6 +2043,9 @@ button.s-jour.s-jour--guess{ color:var(--text-dim); font-style:italic; }
         <button id="menu-btn" class="icon-btn menu-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Paramètres de l’outil" title="Paramètres"><svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><circle cx="4.5" cy="10" r="1.7"/><circle cx="10" cy="10" r="1.7"/><circle cx="15.5" cy="10" r="1.7"/></svg></button></div>
       <div class="theme-pop" id="theme-pop" hidden></div>
       <div class="menu-pop" id="menu-pop" hidden role="menu">
+          <div id="menu-quit-wrap" hidden>
+          <button type="button" class="menu-item" id="menu-quit" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v6.5M5.8 5.8a6 6 0 1 0 8.4 0"/></svg></span><span class="mi-t"><b>Quitter l’application</b></span></button></div>
+          <div class="menu-sep"></div></div>
           <div class="menu-h">Projet</div>
           <button type="button" class="menu-item menu-ai" id="open-aifill" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l1.7 4.6L16 8.3l-4.3 1.7L10 14.6 8.3 10 4 8.3l4.3-1.7z"/><path d="M15.5 12.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span><span class="mi-t"><b>Remplir avec une IA…</b><small>Objectifs et tests de tout le cycle</small></span></button>
           <button type="button" class="menu-item" id="open-lib" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v14M8 3v14M12 4l4 12.5"/></svg></span><span class="mi-t"><b>Bibliothèque de références…</b><small>Tes moments par rôle et adjectif</small></span></button>
@@ -2071,8 +2074,6 @@ button.s-jour.s-jour--guess{ color:var(--text-dim); font-style:italic; }
           <div class="menu-h">Données</div>
           <button type="button" class="menu-item danger" id="reset-all" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg></span><span class="mi-t"><b>Vider le planning…</b><small>Garde la structure, efface textes et progression</small></span></button>
           <button type="button" class="menu-item danger" id="reset-everything" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10a6 6 0 1 0 1.8-4.3"/><path d="M4 3.5v3h3"/></svg></span><span class="mi-t"><b>Revenir au modèle d’origine…</b><small>Tout le projet d’exemple, progression effacée</small></span></button>
-          <div id="menu-quit-wrap" hidden><div class="menu-sep"></div>
-          <button type="button" class="menu-item" id="menu-quit" role="menuitem"><span class="mi-ic"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v6.5M5.8 5.8a6 6 0 1 0 8.4 0"/></svg></span><span class="mi-t"><b>Quitter l’application</b></span></button></div>
         </div>
     </div>
     <div class="meter-bridge">
@@ -5028,7 +5029,7 @@ async function miniOpen0(){
       try{ localStorage.removeItem(MINI_READY); localStorage.setItem(MINI_ON, String(Date.now())); }catch(e){}
       miniWatch();
       const t0 = Date.now();
-      const w = new Ctor('mini', { url:'index.html?mini=1', title:'Minuteur', width:300, height:160, minWidth:280, minHeight:150,
+      const w = new Ctor('mini', { url:'index.html?mini=1', title:'Minuteur', width:290, height:124, minWidth:270, minHeight:112,
         alwaysOnTop:true, resizable:true, skipTaskbar:false, focus:true, visible:false, acceptFirstMouse:true }); /* étape 171 : Mac : le 1er clic sur la fenêtre non active compte aussi */
       await new Promise((ok, no) => { w.once('tauri://created', ok); w.once('tauri://error', e => no(e)); setTimeout(ok, 1500); });
       try{ await w.setAlwaysOnTop(true); }catch(e){ console.error('au-dessus', e); } /* à la création, l'option n'est pas toujours prise : on la repose */
