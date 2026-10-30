@@ -4961,7 +4961,7 @@ function minimize(){ closeTimer(); }
  - Ailleurs (Claude, Safari, téléphone) : rien à proposer, la barre réduite fait le travail.
  Les deux fenêtres parlent par la mémoire du navigateur : la principale écrit l'état (MINI_BEAT) chaque seconde,
  la petite écrit qu'elle est vivante (MINI_ON) et ses commandes (MINI_CMD). Aucune logique de minuteur n'est dupliquée. */
-const MINI_ON = 'dnb-mini-on', MINI_BEAT = 'dnb-mini-v1', MINI_CMD = 'dnb-mini-cmd';
+const MINI_ON = 'dnb-mini-on', MINI_BEAT = 'dnb-mini-v1', MINI_CMD = 'dnb-mini-cmd', MINI_READY = 'dnb-mini-ready';
 const MINI_WIN = /[?&]mini=1/.test(location.search || '');
 const miniAlive = () => { try{ return +(localStorage.getItem(MINI_ON) || 0) > Date.now() - 6000; }catch(e){ return false; } };
 let MINI_PIP = null, miniTick = 0;
@@ -5006,14 +5006,19 @@ async function miniOpen0(){
       const TW = window.__TAURI__ || {}, Ctor = TW.webviewWindow && TW.webviewWindow.WebviewWindow;
       if (!Ctor) throw new Error('fenêtre indisponible');
       try{ const old = await Ctor.getByLabel('mini'); if (old){ await old.close(); for (let k = 0; k < 20 && await Ctor.getByLabel('mini'); k++) await new Promise(r => setTimeout(r, 50)); } }catch(e){} /* étape 171 : on attend que l'ancienne soit vraiment partie */
+      /* étape 174 : la petite fenêtre est créée cachée, l'état est déjà prêt pour elle ; elle se montre seule une fois dessinée, et la grande se cache au même moment (plus de fenêtre vide, plus de décalage) */
+      try{ localStorage.removeItem(MINI_READY); localStorage.setItem(MINI_ON, String(Date.now())); }catch(e){}
+      miniWatch();
+      const t0 = Date.now();
       const w = new Ctor('mini', { url:'index.html?mini=1', title:'Minuteur', width:300, height:160, minWidth:280, minHeight:150,
-        alwaysOnTop:true, resizable:true, skipTaskbar:false, focus:true, acceptFirstMouse:true }); /* étape 171 : Mac : le 1er clic sur la fenêtre non active compte aussi */
+        alwaysOnTop:true, resizable:true, skipTaskbar:false, focus:true, visible:false, acceptFirstMouse:true }); /* étape 171 : Mac : le 1er clic sur la fenêtre non active compte aussi */
       await new Promise((ok, no) => { w.once('tauri://created', ok); w.once('tauri://error', e => no(e)); setTimeout(ok, 1500); });
-      miniFold();
       try{ await w.setAlwaysOnTop(true); }catch(e){ console.error('au-dessus', e); } /* à la création, l'option n'est pas toujours prise : on la repose */
-      try{ localStorage.setItem(MINI_ON, String(Date.now())); }catch(e){}
-      miniWatch(); renderTimer(); toast('Minuteur épinglé : la petite fenêtre reste au-dessus');
-    }catch(e){ console.error('mini', e); toast('Impossible d’ouvrir la petite fenêtre'); }
+      for (let k = 0; k < 100 && !(+(localStorage.getItem(MINI_READY) || 0) >= t0); k++) await new Promise(r => setTimeout(r, 30)); /* au plus 3 s */
+      try{ await w.show(); }catch(e){ console.error('montrer', e); } /* au cas où elle ne se serait pas montrée seule */
+      miniFold();
+      renderTimer(); toast('Minuteur épinglé : la petite fenêtre reste au-dessus');
+    }catch(e){ console.error('mini', e); try{ localStorage.removeItem(MINI_ON); }catch(x){} miniUnfold(); toast('Impossible d’ouvrir la petite fenêtre'); }
     return; }
   if (window.documentPictureInPicture){
     try{
@@ -5099,6 +5104,9 @@ function miniBoot(){
     miniDraw(document, v); };
   window.addEventListener('pagehide', () => { try{ localStorage.removeItem(MINI_ON); }catch(e){} }); /* étape 171 */
   beat(); setInterval(beat, 250);
+  /* étape 174 : la fenêtre est créée cachée : elle se montre seulement après son premier dessin */
+  requestAnimationFrame(() => requestAnimationFrame(() => { try{ localStorage.setItem(MINI_READY, String(Date.now())); }catch(e){}
+    try{ if (window.__TAURI__) window.__TAURI__.window.getCurrentWindow().show(); }catch(e){} }));
 }
 function renderMinibar(){
   const mb = document.getElementById('minibar');
