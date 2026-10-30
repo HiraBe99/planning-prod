@@ -4829,7 +4829,7 @@ function startTimer(id, freeKey, startIdx){
   }
   setTimeout(ensureAudio, 80);
   /* étape 103 : la préparation d'une session (cases « sauvegarde », « bounce », bounce importé) est gardée 12 h si tu fermes avant de lancer, ou si la page se recharge : en revenant, rien n'est perdu */
-  const pre = !s.free ? readLS(PRE_KEY) : null, reuse = !!(pre && pre.id === id && pre.at <= Date.now() && Date.now() - pre.at < 12 * 3600e3);
+  const pre = !s.free ? readLS(PRE_KEY) : null, reuse = !!(pre && pre.id === id && pre.at <= Date.now() && Date.now() - pre.at < 12 * 3600e3 && isoOf(new Date(pre.at)) === todayISO()); /* étape 184 : une préparation ouverte la veille ne garde plus la date d'hier dans les noms de fichiers */
   T = { startedAt: reuse ? pre.at : Date.now(), id: id || null, key: id ? null : freeKey, steps: stepsFor(s), idx: Math.min(startIdx || 0, Math.max(0, stepsFor(s).length - 1)), remaining: 0, endsAt: 0, running: false, active: 0, lastTs: 0, warned: false, finished: false };
   T.remaining = T.steps[T.idx].min * 60000; T.started = false;
   /* nouvelle séance : un export de début ou de fin importé lors d'une séance précédente n'est pas celui d'aujourd'hui → sa ligne repart décochée */
@@ -5209,6 +5209,9 @@ function renderTimer(){
     /* plan : un bouton « ··· » en haut à droite du cadre (comme les autres cartes) au lieu du lien « Écrire un plan » en bas */
     const planBtn = !planning && !closing ? (() => { const has = p.etapes.some(e => e.trim()), l = has ? 'Modifier le plan' : 'Écrire un plan';
       return '<button type="button" class="icon-btn fmt-more meth-edit" data-tc="plan" aria-label="' + l + '" title="' + l + '"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="4.5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15.5" cy="10" r="1.6"/></svg></button>'; })() : '';
+    const lastStep = T.idx >= T.steps.length - 1, showGoal = !T.started || lastStep || planning; /* étape 184 : le but n'est rappelé qu'à la dernière étape (où l'on juge « atteint ou non »), plus en doublon aux étapes du milieu ; le plan et les critères restent */
+    if (!showGoal){ const pc = planCheckHtml(s); goal = '<div class="goal"><div class="goal-lbl">' + I.flag + ' Ton plan' + planBtn + '</div>' + pc + '</div>'; }
+    else
     goal = '<div class="goal">' + (!T.started ? intentBandHtml(s) : '') + '<div class="goal-lbl">' + I.flag + ' But de la session · ' + esc(s.bloc) + planBtn + '</div>' +
       (planning ? '<div class="plan goal-ed" data-pid="' + s.id + '"><textarea rows="1" class="grow plan-title goal-ta" data-pl="titre" aria-label="But de la session" placeholder="Écris ton but, en une phrase">' + esc(myGoal(s)) + '</textarea>' + (myGoal(s) ? '' : ideaHtml(s, 'goal-idea')) + '</div>'
         : '<div class="goal-txt" id="goal-txt" data-inline="plan" tabindex="0" data-iid="' + s.id + '" title="Cliquer pour modifier ton but">' + goalTxtInner(s) + '</div>' + (myGoal(s) ? '' : ideaHtml(s, 'goal-sub goal-idea'))) +
@@ -5344,7 +5347,7 @@ document.addEventListener('keydown', ev => { const f = ev.target.closest && ev.t
 function restoreTimer(){
   const t = readLS(LS_T); if (!t || t.finished || (t.id && !BY_ID[t.id]) || (!t.id && !jamMins(t.key) && !fmts().some(f => f.id === t.key))) { /* session « Jouer » (jam:30) : reprise aussi */ try{ localStorage.removeItem(LS_T); }catch{} return; }
   const s = t.id ? BY_ID[t.id] : freeSession(t.key);
-  T = { id:t.id || null, key:t.key || null, steps:stepsFor(s), idx:Math.min(t.idx, stepsFor(s).length - 1), remaining:t.remaining, endsAt:0, running:false, active:t.active || 0, lastTs:0, warned:false, finished:false, jp:!!t.jp, started: t.started !== undefined ? !!t.started : (t.active || 0) > 0, startedAt:t.startedAt || Date.now(), rit:t.rit || null,  };
+  T = { id:t.id || null, key:t.key || null, steps:stepsFor(s), idx:Math.min(t.idx, stepsFor(s).length - 1), remaining:t.remaining, endsAt:0, running:false, active:t.active || 0, lastTs:0, warned:false, finished:false, jp:!!t.jp, started: t.started !== undefined ? !!t.started : (t.active || 0) > 0, startedAt:(t.startedAt && (t.started || (t.active || 0) > 0 || isoOf(new Date(t.startedAt)) === todayISO())) ? t.startedAt : Date.now(), rit:t.rit || null,  };
   /* minutes ajoutées avec « +5 min » pendant cette séance */
   if (t.fp && typeof t.fp === 'object') T.fp = t.fp;
   if (t.add && typeof t.add === 'object'){ T.add = t.add; Object.keys(t.add).forEach(i => { const x = T.steps[+i]; if (x && t.add[i] > 0) x.min += t.add[i]; }); }
