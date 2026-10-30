@@ -2727,7 +2727,8 @@ async function gdConnect(quiet){
 document.addEventListener('click', () => { try{ if (DESK || !GD_ON() || !GD.st.on || !GD.st.uid || GD.wait) return; const left = (+GD.st.exp || 0) - Date.now();
   if (left > 5 * 60000 || Date.now() - (GD.auto || 0) < 600000 || !gdTc()) return; GD.auto = Date.now(); gdConnect(true); }catch(e){} }, true);
 /* sons pas encore sur Drive (importés avant la liaison, ou pendant une coupure) : envoyés en arrière-plan si la synchro automatique est active */
-function gdQueueSons(){ try{ if (!gdAssetsOn() || !encAuto()) return; const A = auMeta(); Object.keys(A.items || {}).forEach(aid => { if (encNeeds(aid) && AU.has[aid] !== false) encQueue(aid); }); }catch(e){ console.warn('sons drive', e); } }
+function gdQueueSons(){ try{ if (!gdAssetsOn() || !encAuto()) return; const A = auMeta(); /* étape 182 : les envois « original » faits avant la vérification de taille étaient faux (fichiers jetés) : leur repère est oublié une fois, ils repartent vérifiés */
+    if (!A.fix182){ A.fix182 = 1; Object.keys(A.items || {}).forEach(k => { const it = A.items[k]; if (it && it.assetRaw && String(it.asset || '').indexOf('gd:') === 0){ delete it.asset; delete it.assetOrig; delete it.assetRaw; } }); saveMeta(); } Object.keys(A.items || {}).forEach(aid => { if (encNeeds(aid) && AU.has[aid] !== false) encQueue(aid); }); }catch(e){ console.warn('sons drive', e); } }
 
 /* app de bureau : jeton Google. Avec un jeton de renouvellement (GD.st.rt), sans rien demander ; sinon le navigateur habituel s'ouvre
  (PKCE, réponse reçue sur 127.0.0.1 par l'app) ; une connexion silencieuse (prompt '') ne l'ouvre jamais d'elle-même. */
