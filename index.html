@@ -4858,7 +4858,7 @@ function loop(){
     if (Math.floor(now / 1000) % 3 === 0) persistTimer();
   }, 250);
 }
-function holdOn(){ return readLS('dnb-timer-hold') === true; } /* réglage de l'appareil : le temps défile d'un bloc à l'autre (défaut) ou s'arrête à chaque bloc */
+function holdOn(){ if (typeof miniOpenState === 'function' && !MINI_WIN && miniOpenState()) return false; /* étape 185 : petite fenêtre ouverte : le temps défile toujours d'un bloc à l'autre */ return readLS('dnb-timer-hold') === true; } /* réglage de l'appareil : le temps défile d'un bloc à l'autre (défaut) ou s'arrête à chaque bloc */
 function advance(auto){
   if (!T) return;
   if (T.idx >= T.steps.length - 1){ const m = Math.round((T.active || 0) / 60000); finish(); if (!auto){ stopTimer(); toast('Session terminée · ' + m + ' min travaillée' + (m > 1 ? 's' : '')); } return; }
