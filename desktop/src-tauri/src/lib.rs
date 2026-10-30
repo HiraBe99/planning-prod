@@ -3,7 +3,7 @@
 // (le navigateur habituel s'ouvre une fois, la réponse revient sur 127.0.0.1) et l'enregistrement de fichiers.
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// Ouvre un petit serveur local pour recevoir la réponse de Google ; renvoie son port.
 /// La première requête reçue (…/?code=…) est transmise à la page (événement « oauth-code »), puis le serveur s'arrête.
@@ -71,6 +71,19 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
+        // Étape 172 : quand la petite fenêtre se ferme (bouton, croix ou « Ouvrir »), la grande, cachée pendant ce temps, revient toujours,
+        // même si la page principale ne l'a pas remarqué.
+        .on_window_event(|window, event| {
+            if window.label() == "mini" {
+                if let tauri::WindowEvent::Destroyed = event {
+                    if let Some(m) = window.app_handle().get_webview_window("main") {
+                        let _ = m.show();
+                        let _ = m.unminimize();
+                        let _ = m.set_focus();
+                    }
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![oauth_listen, drive_put, keep_awake])
         .run(tauri::generate_context!())
         .expect("Planning prod n'a pas pu démarrer");

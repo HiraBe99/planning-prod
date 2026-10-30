@@ -5037,10 +5037,10 @@ async function miniToggle(){
 /* étape 171 : la petite fenêtre s'ouvre → la grande se replie ; la petite se ferme (bouton, croix ou « Ouvrir ») → la grande revient, avec le minuteur */
 let miniFolded = false;
 function miniFold(){ miniFolded = true;
-  if (DESK){ try{ window.__TAURI__.window.getCurrentWindow().minimize(); }catch(e){ console.error('replier', e); } }
+  if (DESK){ try{ window.__TAURI__.window.getCurrentWindow().hide(); }catch(e){ console.error('replier', e); } } /* étape 172 : la grande fenêtre disparaît (au lieu d'être réduite dans le Dock) */
   else if (T && !T.finished && !document.getElementById('timer').hidden) closeTimer(); }
 function miniUnfold(){ if (!miniFolded) return; miniFolded = false;
-  if (DESK){ try{ const w = window.__TAURI__.window.getCurrentWindow(); Promise.resolve(w.unminimize()).then(() => w.setFocus()).catch(() => {}); }catch(e){ console.error('revenir', e); } }
+  if (DESK){ try{ const w = window.__TAURI__.window.getCurrentWindow(); Promise.resolve(w.show()).then(() => w.unminimize()).then(() => w.setFocus()).catch(() => {}); }catch(e){ console.error('revenir', e); } }
   if (T && !T.finished && document.getElementById('timer').hidden) openTimer(); }
 function miniClose(){
   if (MINI_PIP){ try{ MINI_PIP.close(); }catch(e){} MINI_PIP = null; }
