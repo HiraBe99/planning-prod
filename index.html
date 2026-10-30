@@ -4818,6 +4818,8 @@ function startTimer(id, freeKey, startIdx){
     askDialog('Une autre session est en cours', 'Veux-tu la remplacer par celle-ci ?', [ { label: 'Remplacer', value: true, primary: true }, { label: 'Revenir à la session en cours', value: false } ])
       .then(ok => { if (ok){ /* étape 163 : comme « Arrêter » en gardant les minutes : le temps déjà travaillé sur l'autre session est noté, le minuteur rangé proprement (avant : minutes perdues, carte restée sur « En cours », ancien minuteur encore en mémoire) */
           const old = T; const mins = old && !old.finished && old.id ? Math.round((old.active || 0) / 60000) : 0; if (mins > 0 && BY_ID[old.id]){ addMinutes(old.id, mins); saveProgress(); try{ refreshWeek(BY_ID[old.id].week); renderSuivi(); }catch(e){} }
+          /* étape 178 : une session rapide commencée puis remplacée est terminée (sinon elle restait ouverte et repassait en premier sur la carte « Prochaine session ») */
+          { const os = old && old.id ? BY_ID[old.id] : null; if (os && os.extra && !os.prolong && old.started && !(progress[os.id] && progress[os.id].done)){ markDone(os.id, true); planLog('Faite : ' + os.bloc + ' (remplacée par une autre session)'); saveMeta(); saveProgress(); try{ refreshWeek(os.week); renderSuivi(); }catch(e){} } }
           clearInterval(tick); keepAwake(false); T = null; persistTimer(); startTimer(id, freeKey, startIdx); if (jamMins(freeKey) && T && !T.started) resume(); try{ renderNext(); renderSplits(); }catch(e){} } else openTimer(); });
     return;
   }
