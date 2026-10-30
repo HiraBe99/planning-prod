@@ -2666,15 +2666,17 @@ async function gdSons(){ if (GD.st.sid) return GD.st.sid; const fid = await gdFo
   let id = l.length ? l[l.length - 1].id : null;
   if (!id) id = (await (await gdF(GAPI + '?fields=id', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ name:'sons', mimeType:'application/vnd.google-apps.folder', parents:[fid] }) })).json()).id;
   GD.st.sid = id; gdSaveSt(); return id; }
+/* étape 179 : le fichier arrivé sur Drive doit avoir exactement la taille envoyé ; sinon il est supprimé et l'envoi échoue (jamais de copie fausse qui remplit le Drive) */
+async function gdSizeOk(j, blob){ if (j && j.id && j.size !== undefined && +j.size !== blob.size){ try{ await gdF(GAPI + '/' + j.id, { method:'DELETE' }); }catch(e){} console.error('taille Drive', j.size, blob.size); throw { code:'size' }; } }
 const gdAssets = {
   upload: async (blob, o) => { const type = (o && o.type) || blob.type || 'application/octet-stream', sid = await gdSons();
-    const r = await gdF(GUP + '?uploadType=resumable&fields=id', { method:'POST', headers:{ 'Content-Type':'application/json; charset=UTF-8', 'X-Upload-Content-Type':type }, body: JSON.stringify({ name: blob.name || 'fichier', parents:[sid] }) });
+    const r = await gdF(GUP + '?uploadType=resumable&fields=id,size', { method:'POST', headers:{ 'Content-Type':'application/json; charset=UTF-8', 'X-Upload-Content-Type':type }, body: JSON.stringify({ name: blob.name || 'fichier', parents:[sid] }) });
     const loc = r.headers.get('Location'); if (!loc) throw { code:'upload' };
     if (DESK){ /* étape 149 : app de bureau : le fichier part tel quel par l'app (le module http de l'app le convertissait en texte : trop lourd pour un son) */
       let x; try{ x = await window.__TAURI__.core.invoke('drive_put', new Uint8Array(await blob.arrayBuffer()), { headers:{ 'x-url':loc, 'x-type':type } }); }catch(e){ throw { code:'offline' }; }
-      if (!x || x.status < 200 || x.status >= 300) throw { code: x && x.status === 401 ? 'auth' : 'http_' + (x && x.status) }; const j = JSON.parse(x.body || '{}'); return { id:'gd:' + j.id, sizeBytes:blob.size, contentType:type }; }
+      if (!x || x.status < 200 || x.status >= 300) throw { code: x && x.status === 401 ? 'auth' : 'http_' + (x && x.status) }; const j = JSON.parse(x.body || '{}'); await gdSizeOk(j, blob); return { id:'gd:' + j.id, sizeBytes:blob.size, contentType:type }; }
     let r2; try{ r2 = await fetch(loc, { method:'PUT', headers:{ 'Content-Type':type }, body:blob }); }catch(e){ throw { code:'offline' }; }
-    if (!r2.ok) throw { code:'http_' + r2.status }; const j = await r2.json(); return { id:'gd:' + j.id, sizeBytes:blob.size, contentType:type }; },
+    if (!r2.ok) throw { code:'http_' + r2.status }; const j = await r2.json(); await gdSizeOk(j, blob); return { id:'gd:' + j.id, sizeBytes:blob.size, contentType:type }; },
   delete: async ref => { ref = String(ref || ''); if (ref.indexOf('gd:') !== 0) return { deleted:false }; try{ await gdF(GAPI + '/' + ref.slice(3), { method:'DELETE' }); return { deleted:true }; }catch(e){ if (e.code === 'not_found') return { deleted:false }; throw e; } }
 };
 /* fichier stocké : dans Claude « /_blob/<id> », sur Drive le fichier lui-même ; jamais d'exception (réponse « pas ok » à la place) */
