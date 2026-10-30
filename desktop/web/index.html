@@ -7325,7 +7325,9 @@ let fsRaf = 0; new MutationObserver(() => { if (fsRaf) return; fsRaf = requestAn
 { const go = () => { if (MINI_WIN){ miniBoot(); return; } /* étape 168 : la petite fenêtre n'ouvre ni les données ni Drive : elle lit l'état de la grande */
     bindClEditor(); bindCrEditor(); bindRkEditor(); bindSearch(); init(); fsSync(); maybeToday(); maybeOnboard();
     if (DESK && !MINI_WIN){ try{ const qw = document.getElementById('menu-quit-wrap'); if (qw) qw.hidden = false; const W0 = window.__TAURI__.window.getCurrentWindow(); /* étape 173 : la croix de la grande fenêtre la réduit (l'app continue de tourner) tant qu'une session ou la petite fenêtre est ouverte ; sinon elle ferme l'app comme avant */
-      W0.onCloseRequested(ev => { if ((T && !T.finished) || miniOpenState()){ ev.preventDefault(); try{ W0.minimize(); }catch(e){} } }); }catch(e){ console.error('croix', e); } }
+      W0.onCloseRequested(async ev => { if ((T && !T.finished) || miniOpenState()){ ev.preventDefault();
+        let red = false; try{ red = await W0.isMinimized(); }catch(e){} /* étape 176 : déjà réduite (barre des tâches : « Fermer la fenêtre ») : cette fois l'app se ferme pour de bon */
+        if (red) quitApp(); else { try{ W0.minimize(); }catch(e){} } } }); }catch(e){ console.error('croix', e); } }
     if (miniAlive()) miniWatch(); /* étape 168 : la petite fenêtre était déjà ouverte (page rechargée) : on reprend l'envoi de l'état */
     window.addEventListener('storage', ev => { if (ev.key === MINI_ON && miniAlive()) miniWatch(); }); }; if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else setTimeout(go); }
 /* ===== ÉCOUTE : fichiers audio (référence du morceau, exports de début et de fin) =====
