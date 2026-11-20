@@ -4844,7 +4844,7 @@ function resume(){ if (!T || T.finished) return; const first = !T.started; ensur
 function pause(){ if (!T) return; T.remaining = remainingMs(); T.running = false; keepAwake(false); persistTimer(); renderTimer(); }
 function loop(){
   clearInterval(tick);
-  tick = setInterval(() => {
+  tickFn = () => {
     if (!T || !T.running) return;
     const now = Date.now(); if (now < T.lastTs - 2000){ T.endsAt -= T.lastTs - now; T.lastTs = now; } /* étape 153 : horloge de l'appareil remise en arrière (correction de l'heure) : l'étape garde le même temps restant, au lieu de rallonger d'autant */
     const dlt = Math.max(0, Math.min(now, T.endsAt) - T.lastTs); T.active += dlt; T.lastTs = now;
@@ -4856,7 +4856,8 @@ function loop(){
       if (left <= 300000){ T.jp = true; play('journal'); if (document.getElementById('timer').hidden) openTimer(); else renderTimer();
         const j = document.querySelector('#timer .jprompt'); if (j && j.scrollIntoView && Date.now() - (T.stepAt || 0) > 4000) j.scrollIntoView({ behavior:'smooth', block:'start' }); } } /* étape 104 : pas de saut de page à l'arrivée sur une étape */
     if (Math.floor(now / 1000) % 3 === 0) persistTimer();
-  }, 250);
+  };
+  tick = setInterval(tickFn, 250); pulseOn();
 }
 function holdOn(){ if (typeof miniOpenState === 'function' && !MINI_WIN && miniOpenState()) return false; /* étape 185 : petite fenêtre ouverte : le temps défile toujours d'un bloc à l'autre */ return readLS('dnb-timer-hold') === true; } /* réglage de l'appareil : le temps défile d'un bloc à l'autre (défaut) ou s'arrête à chaque bloc */
 function advance(auto){
@@ -4983,6 +4984,13 @@ const MINI_ON = 'dnb-mini-on', MINI_BEAT = 'dnb-mini-v1', MINI_CMD = 'dnb-mini-c
 const MINI_WIN = /[?&]mini=1/.test(location.search || '');
 const miniAlive = () => { try{ return +(localStorage.getItem(MINI_ON) || 0) > Date.now() - 6000; }catch(e){ return false; } };
 let MINI_PIP = null, miniTick = 0;
+/* étape 186 : app de bureau : la grande fenêtre cachée derrière la petite était endormie par le système au bout de ~5 min (minuterie ralentie, petite fenêtre figée).
+   Un battement venu d'un fil à part (non ralenti) fait tourner le minuteur et la petite fenêtre ; un verrou tenu empêche la mise en sommeil de la page. */
+let tickFn = null, PULSE = null;
+function pulseOn(){ if (PULSE !== null || !DESK || MINI_WIN) return;
+  try{ const u = URL.createObjectURL(new Blob(['setInterval(function(){postMessage(0)},250)'], { type:'text/javascript' })); PULSE = new Worker(u);
+    PULSE.onmessage = () => { if (!document.hidden) return; try{ if (tickFn && T && T.running) tickFn(); }catch(e){} try{ if (miniTick) miniPoll(); }catch(e){} }; }catch(e){ PULSE = false; console.error('battement', e); }
+  try{ if (navigator.locks && !pulseOn.lock){ pulseOn.lock = 1; navigator.locks.request('planning-prod-eveil', () => new Promise(() => {})).catch(() => {}); } }catch(e){} }
 /* proposé seulement là où une fenêtre peut vraiment sortir de la page : l'app de bureau, ou un navigateur d'ordinateur qui sait le faire.
    Dans Claude (page dans un cadre) et sur téléphone : rien, la barre réduite fait le travail. */
 function miniCan(){ if (MINI_WIN) return false; if (DESK) return true;
@@ -5014,7 +5022,7 @@ function miniDo(c){
   else if (c === 'reset'){ if (T && !T.finished) timerControl('reset'); } /* étape 177 */
   else if (c === 'open'){ miniClose(); openTimer(); try{ if (DESK && window.__TAURI__ && window.__TAURI__.window) window.__TAURI__.window.getCurrentWindow().setFocus(); }catch(e){} }
 }
-function miniWatch(){ if (miniTick) return; miniTick = setInterval(miniPoll, 300); miniPush(); }
+function miniWatch(){ if (miniTick) return; miniTick = setInterval(miniPoll, 300); miniPush(); pulseOn(); }
 /* ouverture */
 async function miniOpen(){
   if (MINI_WIN || miniOpen.busy) return; miniOpen.busy = true;

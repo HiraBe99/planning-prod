@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Planning prod",
-  "version": "1.0.40",
+  "version": "1.0.41",
   "identifier": "io.github.hirabe99.planningprod",
   "build": {
     "frontendDist": "../web"
@@ -17,7 +17,8 @@
         "minHeight": 500,
         "resizable": true,
         "dragDropEnabled": false,
-        "acceptFirstMouse": true
+        "acceptFirstMouse": true,
+        "backgroundThrottling": "disabled"
       }
     ],
     "security": {
